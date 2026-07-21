@@ -6,6 +6,7 @@ import NEx_SDBM.core.node_editor as NEx
 import NEx_SDBM.core.serializer as serializer
 
 from NEx_SDBM.items.backdrop import BackdropItem
+import NEx_SDBM.core.scene_storage as scene_storage
 from NEx_SDBM.core.utilities import undoChunk as unDo
 
 _NEX_ITEMS = []
@@ -263,6 +264,55 @@ def load_all_dialog():
         result[0],
         clear_existing=True
     )
+
+# ---------------------------------------------------------
+# SceneLoader
+# ---------------------------------------------------------
+def save_to_scene():
+
+    data = serializer.build_data()
+
+    node = scene_storage.write_scene_data(
+        data
+    )
+
+    return node
+
+
+def load_from_scene(
+    clear_existing=True
+):
+
+    if clear_existing:
+        clear_all_backdrops()
+
+    data = scene_storage.read_scene_data()
+
+    created = serializer.load_data(
+        data
+    )
+
+    _NEX_ITEMS.extend(
+        created
+    )
+
+    print(
+        "NEx | Loaded {} backdrop(s) from scene data.".format(
+            len(created)
+        )
+    )
+
+    return created
+
+
+def clear_scene_storage():
+
+    return scene_storage.clear_scene_data()
+
+
+def has_scene_storage():
+
+    return scene_storage.has_scene_data()
 
 
 _NEX_WINDOW = None

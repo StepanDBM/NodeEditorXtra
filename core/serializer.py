@@ -575,6 +575,17 @@ def load_nex(filepath):
 
     return created
 
+# ---------------------------------------------------------
+# SceneLoader
+# ---------------------------------------------------------
+
+def load_data(data):
+
+    created = load_tabs_from_data(
+        data
+    )
+
+    return created
 
 # ---------------------------------------------------------
 # Clear

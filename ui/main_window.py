@@ -2,7 +2,9 @@
 
 from maya import OpenMayaUI
 from maya import cmds
+
 import NEx_SDBM.api as api
+
 
 try:
     from shiboken2 import wrapInstance
@@ -17,7 +19,8 @@ try:
         QPushButton,
         QVBoxLayout,
         QHBoxLayout,
-        QLabel
+        QLabel,
+        QFrame
     )
 
 except ImportError:
@@ -33,7 +36,8 @@ except ImportError:
         QPushButton,
         QVBoxLayout,
         QHBoxLayout,
-        QLabel
+        QLabel,
+        QFrame
     )
 
 
@@ -93,12 +97,20 @@ class NExMainWindow(QWidget):
             title
         )
 
+        # -------------------------------------------------
+        # Main actions
+        # -------------------------------------------------
+
         self.create_backdrop_btn = QPushButton(
-            "Create Backdrop From Selection"
+            "Create Backdrop"
         )
 
         self.delete_selected_btn = QPushButton(
-            "Delete Selected Backdrops"
+            "Delete Selected"
+        )
+
+        self.clear_all_btn = QPushButton(
+            "Clear All"
         )
 
         main_layout.addWidget(
@@ -109,10 +121,44 @@ class NExMainWindow(QWidget):
             self.delete_selected_btn
         )
 
+        main_layout.addWidget(
+            self.clear_all_btn
+        )
+
+        # -------------------------------------------------
+        # Scene persistence
+        # -------------------------------------------------
+
+        scene_layout = QHBoxLayout()
+
+        self.save_scene_btn = QPushButton(
+            "Save"
+        )
+
+        self.load_scene_btn = QPushButton(
+            "Load"
+        )
+
+        scene_layout.addWidget(
+            self.save_scene_btn
+        )
+
+        scene_layout.addWidget(
+            self.load_scene_btn
+        )
+
+        main_layout.addLayout(
+            scene_layout
+        )
+
+        # -------------------------------------------------
+        # External .nex import/export
+        # -------------------------------------------------
+
         file_layout = QHBoxLayout()
 
         self.save_btn = QPushButton(
-            "Save .nex"
+            "Export"
         )
 
         self.load_btn = QPushButton(
@@ -131,16 +177,34 @@ class NExMainWindow(QWidget):
             file_layout
         )
 
-        self.clear_all_btn = QPushButton(
-            "Clear All Backdrops"
+        # -------------------------------------------------
+        # Dev separator
+        # -------------------------------------------------
+
+        separator = QFrame()
+
+        separator.setFrameShape(
+            QFrame.HLine
+        )
+
+        separator.setFrameShadow(
+            QFrame.Sunken
         )
 
         main_layout.addWidget(
-            self.clear_all_btn
+            separator
+        )
+
+        dev_label = QLabel(
+            "Development"
+        )
+
+        main_layout.addWidget(
+            dev_label
         )
 
         self.reload_btn = QPushButton(
-            "Dev Reload Modules"
+            "DevReloadModules"
         )
 
         main_layout.addWidget(
@@ -157,16 +221,24 @@ class NExMainWindow(QWidget):
             self.delete_selected_backdrops
         )
 
+        self.clear_all_btn.clicked.connect(
+            self.clear_all_backdrops
+        )
+
+        self.save_scene_btn.clicked.connect(
+            self.save_to_scene
+        )
+
+        self.load_scene_btn.clicked.connect(
+            self.load_from_scene
+        )
+
         self.save_btn.clicked.connect(
             self.save_all
         )
 
         self.load_btn.clicked.connect(
             self.load_all
-        )
-
-        self.clear_all_btn.clicked.connect(
-            self.clear_all_backdrops
         )
 
         self.reload_btn.clicked.connect(
@@ -200,7 +272,6 @@ class NExMainWindow(QWidget):
 
     def _create_backdrop_from_selection_deferred(self):
 
-
         try:
 
             api.create_backdrop_from_selection(
@@ -227,31 +298,8 @@ class NExMainWindow(QWidget):
                 error
             )
 
-    def save_all(self):
-        try:
-
-            api.save_all_dialog()
-
-        except Exception as error:
-
-            print(
-                "NEx | Could not save:",
-                error
-            )
-
-    def load_all(self):
-        try:
-
-            api.load_all_dialog()
-
-        except Exception as error:
-
-            print(
-                "NEx | Could not load:",
-                error
-            )
-
     def clear_all_backdrops(self):
+
         try:
 
             api.clear_all_backdrops()
@@ -260,6 +308,60 @@ class NExMainWindow(QWidget):
 
             print(
                 "NEx | Could not clear:",
+                error
+            )
+
+    def save_to_scene(self):
+
+        try:
+
+            api.save_to_scene()
+
+        except Exception as error:
+
+            print(
+                "NEx | Could not save to scene:",
+                error
+            )
+
+    def load_from_scene(self):
+
+        try:
+
+            api.load_from_scene(
+                clear_existing=True
+            )
+
+        except Exception as error:
+
+            print(
+                "NEx | Could not load from scene:",
+                error
+            )
+
+    def save_all(self):
+
+        try:
+
+            api.save_all_dialog()
+
+        except Exception as error:
+
+            print(
+                "NEx | Could not export:",
+                error
+            )
+
+    def load_all(self):
+
+        try:
+
+            api.load_all_dialog()
+
+        except Exception as error:
+
+            print(
+                "NEx | Could not load .nex:",
                 error
             )
 

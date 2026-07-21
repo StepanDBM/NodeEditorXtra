@@ -6,6 +6,7 @@ import importlib
 MODULES = [
     "NEx_SDBM.core.node_editor",
     "NEx_SDBM.core.serializer",
+    "NEx_SDBM.core.scene_storage",
 
     "NEx_SDBM.core.utilities.undoChunk",
 
