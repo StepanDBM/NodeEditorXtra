@@ -1,5 +1,9 @@
 try:
-    from PySide2.QtWidgets import QGraphicsItem
+    from PySide2.QtWidgets import (
+        QGraphicsItem,
+        QApplication
+    )
+
     from PySide2.QtGui import (
         QColor,
         QBrush,
@@ -11,23 +15,33 @@ try:
         QRectF,
         Qt
     )
+
 except ImportError:
-    from PySide6.QtWidgets import QGraphicsItem
+    from PySide6.QtWidgets import (
+        QGraphicsItem,
+        QApplication
+    )
+
     from PySide6.QtGui import (
         QColor,
         QBrush,
         QPen,
         QPainter
     )
+
     from PySide6.QtCore import (
         QRectF,
         Qt
     )
 
-import ui.backdrop_editor as BdE
+
+import NEx_SDBM.ui.backdrop_editor as BdE
+import NEx_SDBM.core.node_editor as NEx
+import NEx_SDBM.core.nex_selection as NExSelection
 
 
 class BackdropItem(QGraphicsItem):
+
     def __init__(
         self,
         title="Backdrop",
@@ -36,14 +50,37 @@ class BackdropItem(QGraphicsItem):
     ):
         super().__init__()
 
+        # -------------------------------------------------
+        # NEx identity / selection
+        # -------------------------------------------------
+
+        self.nex_item_type = "backdrop"
+        self.nex_selected = False
+
+        # -------------------------------------------------
+        # Interaction state
+        # -------------------------------------------------
+
         self._x_pressed = False
+
         self.contained_nodes = []
+
         self._dragging = False
         self._drag_start_mouse = None
         self._drag_start_pos = None
+
         self._resizing = False
         self._resize_edge = None
         self.resize_margin = 8
+
+        self._hovered = False
+        self._pressed = False
+
+        self._multi_drag_start_positions = {}
+
+        # -------------------------------------------------
+        # Data
+        # -------------------------------------------------
 
         self.title = title
 
@@ -52,19 +89,64 @@ class BackdropItem(QGraphicsItem):
         self.header_height = 35
         self.roundness = 4
 
-        self.background_color = QColor(70, 120, 255, 80)
-        self.header_color = QColor(50, 80, 180, 180)
-        self.border_color = QColor(70, 150, 255)
-        self.pressed_border_color = QColor(255, 180, 0)
+        self.background_color = QColor(
+            70,
+            120,
+            255,
+            80
+        )
 
-        self.setFlag(QGraphicsItem.ItemIsMovable,False)
-        self.setFlag(QGraphicsItem.ItemIsSelectable,True)
-        self.setFlag(QGraphicsItem.ItemIsFocusable,True)
-        self.setAcceptHoverEvents(True)
+        self.header_color = QColor(
+            50,
+            80,
+            180,
+            180
+        )
+
+        self.border_color = QColor(
+            70,
+            150,
+            255
+        )
+
+        self.pressed_border_color = QColor(
+            255,
+            180,
+            0
+        )
+
+        # -------------------------------------------------
+        # Qt flags
+        # -------------------------------------------------
+
+        self.setFlag(
+            QGraphicsItem.ItemIsMovable,
+            False
+        )
+
+        # IMPORTANT:
+        # Maya/Qt selection is disabled for NEx backdrops.
+        # We use NExSelection instead.
+        self.setFlag(
+            QGraphicsItem.ItemIsSelectable,
+            False
+        )
+
+        self.setFlag(
+            QGraphicsItem.ItemIsFocusable,
+            True
+        )
+
+        self.setAcceptHoverEvents(
+            True
+        )
 
         self.close_size = 20
         self.close_padding = 8
 
+    # -----------------------------------------------------
+    # State
+    # -----------------------------------------------------
 
     def clear_drag_state(self):
 
@@ -72,32 +154,47 @@ class BackdropItem(QGraphicsItem):
         self._drag_start_mouse = None
         self._drag_start_pos = None
         self._x_pressed = False
+        self._multi_drag_start_positions = {}
+
+    # -----------------------------------------------------
+    # Rects
+    # -----------------------------------------------------
 
     def get_close_rect(self):
+
         size = 18
         margin = 6
 
         return QRectF(
             self.width - size - margin,
-            (35 - size) * 0.5,
+            (self.header_height - size) * 0.5,
             size,
             size
         )
-    
+
     def get_header_rect(self):
+
         return QRectF(
             0,
             0,
             self.width,
             self.header_height
         )
-    
-    def is_in_drag_area(self, pos):
-        if self.get_close_rect().contains(pos):
+
+    def is_in_drag_area(
+        self,
+        pos
+    ):
+
+        if self.get_close_rect().contains(
+            pos
+        ):
             return False
 
-        return self.get_header_rect().contains(pos)
-        
+        return self.get_header_rect().contains(
+            pos
+        )
+
     def get_resize_edge(
         self,
         pos
@@ -128,22 +225,152 @@ class BackdropItem(QGraphicsItem):
 
         return None
 
+    # -----------------------------------------------------
+    # Color helpers
+    # -----------------------------------------------------
+
+    def clone_color(
+        self,
+        color
+    ):
+
+        return QColor(
+            color.red(),
+            color.green(),
+            color.blue(),
+            color.alpha()
+        )
+
+    def get_hover_background_color(self):
+
+        color = self.clone_color(
+            self.background_color
+        )
+
+        return color.lighter(
+            120
+        )
+
+    def get_pressed_background_color(self):
+
+        color = self.clone_color(
+            self.background_color
+        )
+
+        return color.lighter(
+            145
+        )
+
+    def get_hover_header_color(self):
+
+        color = self.clone_color(
+            self.header_color
+        )
+
+        return color.lighter(
+            120
+        )
+
+    def get_pressed_header_color(self):
+
+        color = self.clone_color(
+            self.header_color
+        )
+
+        return color.lighter(
+            150
+        )
+
+    def get_soft_selection_color(self):
+
+        color = self.clone_color(
+            self.background_color
+        )
+
+        color.setAlpha(
+            210
+        )
+
+        return color.lighter(
+            180
+        )
+
+    def get_pressed_selection_color(self):
+
+        return QColor(
+            90,
+            255,
+            130,
+            240
+        )
+
+    def get_paint_background_color(self):
+
+        if self._pressed:
+            return self.get_pressed_background_color()
+
+        if self._hovered:
+            return self.get_hover_background_color()
+
+        return self.background_color
+
+    def get_paint_header_color(self):
+
+        if self._pressed:
+            return self.get_pressed_header_color()
+
+        if self._hovered:
+            return self.get_hover_header_color()
+
+        return self.header_color
+
+    def get_paint_border_color(self):
+
+        if self._pressed:
+            return self.get_pressed_selection_color()
+
+        if self.nex_selected:
+            return self.get_soft_selection_color()
+
+        color = self.clone_color(
+            self.background_color
+        )
+
+        color.setAlpha(
+            150
+        )
+
+        return color.lighter(
+            130
+        )
+
+    # -----------------------------------------------------
+    # Deletion
+    # -----------------------------------------------------
 
     def delete_self(self):
+
+        NExSelection.deselect_item(
+            self
+        )
 
         scene = self.scene()
 
         if scene:
-            scene.removeItem(self)
+            scene.removeItem(
+                self
+            )
 
     def contextMenuEvent(
         self,
         event
     ):
 
-        from PySide2.QtWidgets import (
-            QMenu
-        )
+        try:
+            from PySide2.QtWidgets import QMenu
+
+        except ImportError:
+            from PySide6.QtWidgets import QMenu
 
         menu = QMenu()
 
@@ -156,50 +383,96 @@ class BackdropItem(QGraphicsItem):
         )
 
         if result == delete_action:
+            self.delete_self()
 
-            scene = self.scene()
+    # -----------------------------------------------------
+    # Selection
+    # -----------------------------------------------------
 
-            if scene:
+    def select_from_event(
+        self,
+        event,
+        allow_toggle=True
+    ):
 
-                scene.removeItem(self)
+        modifiers = QApplication.keyboardModifiers()
+
+        additive = bool(
+            modifiers & Qt.ShiftModifier
+        )
+
+        if additive and allow_toggle:
+
+            was_selected = NExSelection.is_selected(
+                self
+            )
+
+            NExSelection.toggle_item(
+                self
+            )
+
+            return not was_selected
+
+        NExSelection.select_item(
+            self,
+            additive=False
+        )
+
+        return True
+
+    # -----------------------------------------------------
+    # Mouse events
+    # -----------------------------------------------------
 
     def mousePressEvent(
         self,
         event
     ):
-        print("PRESS")
+
+        self._pressed = True
+        self.update()
 
         self._x_pressed = (
             self.get_close_rect().contains(
                 event.pos()
             )
         )
+
         edge = self.get_resize_edge(
             event.pos()
         )
 
         if edge:
 
-            self._resizing = True
+            self.select_from_event(
+                event,
+                allow_toggle=False
+            )
 
+            self._resizing = True
             self._resize_edge = edge
 
             self._resize_start_mouse = (
                 event.scenePos()
             )
 
-            self._start_width = (
-                self.width
-            )
-
-            self._start_height = (
-                self.height
-            )
+            self._start_width = self.width
+            self._start_height = self.height
 
             event.accept()
             return
 
         if self._x_pressed:
+
+            # Do not toggle multi-selection on X.
+            # X deletes only this backdrop.
+            if not NExSelection.is_selected(
+                self
+            ):
+                NExSelection.select_item(
+                    self,
+                    additive=False
+                )
 
             event.accept()
             return
@@ -208,35 +481,68 @@ class BackdropItem(QGraphicsItem):
             event.pos()
         ):
 
+            should_start_drag = self.select_from_event(
+                event,
+                allow_toggle=True
+            )
+
+            if not should_start_drag:
+
+                self._pressed = False
+                self.update()
+
+                event.accept()
+                return
+
             self.update_contained_nodes()
 
-            self._drag_start_mouse = event.scenePos()
-            self._drag_start_pos = self.pos()
+            self._drag_start_mouse = (
+                event.scenePos()
+            )
+
+            self._drag_start_pos = (
+                self.pos()
+            )
+
             self._dragging = False
 
+            selected_backdrops = (
+                NExSelection.get_selected_backdrops()
+            )
+
+            self._multi_drag_start_positions = {
+                item: item.pos()
+                for item in selected_backdrops
+                if item is not self
+            }
+
             event.accept()
-
             return
-        super().mousePressEvent(event)
 
+        super().mousePressEvent(
+            event
+        )
 
     def mouseReleaseEvent(
         self,
         event
     ):
-        print("RELEASE")
+
+        self._pressed = False
+        self.update()
+
         self.setCursor(
             Qt.ArrowCursor
         )
+
         if self._resizing:
 
             self._resizing = False
-
             self._resize_edge = None
 
             event.accept()
-
             return
+
         if self._x_pressed:
 
             self._x_pressed = False
@@ -246,52 +552,67 @@ class BackdropItem(QGraphicsItem):
             ):
                 self.delete_self()
 
+            event.accept()
             return
 
         self.clear_drag_state()
 
-        super().mouseReleaseEvent(event)
-        
+        super().mouseReleaseEvent(
+            event
+        )
+
     def mouseDoubleClickEvent(
         self,
         event
     ):
-        print("DOUBLE CLICK")
+
         self.clear_drag_state()
-        
+
+        self._pressed = False
+        self.update()
+
         editor = BdE.BackdropEditor(
             backdrop=self
         )
 
         editor.exec_()
+
         event.accept()
 
     def mouseMoveEvent(
         self,
         event
     ):
+
         if self._resizing:
+
             delta = (
                 event.scenePos()
                 - self._resize_start_mouse
             )
+
             self.setCursor(
                 Qt.ClosedHandCursor
             )
 
             self.prepareGeometryChange()
+
             if self._resize_edge == "right":
+
                 self.width = max(
                     100,
                     self._start_width
                     + delta.x()
                 )
+
             elif self._resize_edge == "bottom":
+
                 self.height = max(
                     60,
                     self._start_height
                     + delta.y()
                 )
+
             elif self._resize_edge == "bottom_right":
 
                 self.width = max(
@@ -305,7 +626,9 @@ class BackdropItem(QGraphicsItem):
                     self._start_height
                     + delta.y()
                 )
+
             self.update()
+
             event.accept()
             return
 
@@ -339,15 +662,64 @@ class BackdropItem(QGraphicsItem):
             - self.pos()
         )
 
-        self.setPos(new_pos)
-        event.accept()
+        self.setPos(
+            new_pos
+        )
 
-        import core.node_editor as NEx
-
+        # The actively dragged backdrop moves its Maya nodes.
         NEx.move_nodes(
             self.contained_nodes,
             move_delta.x(),
             move_delta.y()
+        )
+
+        # Other selected NEx backdrops move visually only.
+        for item, start_pos in self._multi_drag_start_positions.items():
+
+            try:
+                item.setPos(
+                    start_pos + delta
+                )
+
+            except RuntimeError:
+                pass
+
+            except Exception:
+                pass
+
+        event.accept()
+
+    # -----------------------------------------------------
+    # Hover events
+    # -----------------------------------------------------
+
+    def hoverEnterEvent(
+        self,
+        event
+    ):
+
+        self._hovered = True
+        self.update()
+
+        super().hoverEnterEvent(
+            event
+        )
+
+    def hoverLeaveEvent(
+        self,
+        event
+    ):
+
+        self._hovered = False
+        self._pressed = False
+        self.update()
+
+        self.setCursor(
+            Qt.ArrowCursor
+        )
+
+        super().hoverLeaveEvent(
+            event
         )
 
     def hoverMoveEvent(
@@ -395,7 +767,9 @@ class BackdropItem(QGraphicsItem):
             event
         )
 
-
+    # -----------------------------------------------------
+    # Geometry / Membership
+    # -----------------------------------------------------
 
     def boundingRect(self):
 
@@ -408,8 +782,6 @@ class BackdropItem(QGraphicsItem):
 
     def update_contained_nodes(self):
 
-        import core.node_editor as NEx
-
         scene_map = NEx.get_scene_node_map()
 
         self.contained_nodes = []
@@ -420,11 +792,17 @@ class BackdropItem(QGraphicsItem):
 
             node_bounds = item.sceneBoundingRect()
 
-            if my_bounds.contains(node_bounds):
+            if my_bounds.contains(
+                node_bounds
+            ):
 
                 self.contained_nodes.append(
                     node_name
                 )
+
+    # -----------------------------------------------------
+    # Paint
+    # -----------------------------------------------------
 
     def paint(
         self,
@@ -433,17 +811,45 @@ class BackdropItem(QGraphicsItem):
         widget
     ):
 
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(
+            QPainter.Antialiasing
+        )
 
-        background_color = self.background_color
-        border_color = self.border_color
+        background_color = (
+            self.get_paint_background_color()
+        )
 
-        if self.isSelected():
-            border_color = self.pressed_border_color
+        header_color = (
+            self.get_paint_header_color()
+        )
 
-        painter.setBrush(QBrush(background_color))
-        painter.setPen(QPen(border_color, 2))
-        painter.drawRoundedRect(self.boundingRect(),
+        border_color = (
+            self.get_paint_border_color()
+        )
+
+        border_width = 2
+
+        if self._pressed:
+            border_width = 3
+
+        elif self.nex_selected:
+            border_width = 3
+
+        painter.setBrush(
+            QBrush(
+                background_color
+            )
+        )
+
+        painter.setPen(
+            QPen(
+                border_color,
+                border_width
+            )
+        )
+
+        painter.drawRoundedRect(
+            self.boundingRect(),
             self.roundness,
             self.roundness
         )
@@ -455,7 +861,9 @@ class BackdropItem(QGraphicsItem):
             self.header_height
         )
 
-        painter.setBrush(self.header_color)
+        painter.setBrush(
+            header_color
+        )
 
         painter.drawRoundedRect(
             header_rect,
@@ -473,16 +881,26 @@ class BackdropItem(QGraphicsItem):
             25,
             self.title
         )
+
         close_rect = self.get_close_rect()
 
-        painter.setBrush(QBrush(
-                QColor(120, 30, 30)
+        painter.setBrush(
+            QBrush(
+                QColor(
+                    120,
+                    30,
+                    30
+                )
             )
         )
 
         painter.setPen(
             QPen(
-                QColor(255, 255, 255),
+                QColor(
+                    255,
+                    255,
+                    255
+                ),
                 1
             )
         )
@@ -508,7 +926,11 @@ class BackdropItem(QGraphicsItem):
             )
         )
 
-        for offset in (4, 8, 12):
+        for offset in (
+            4,
+            8,
+            12
+        ):
 
             painter.drawLine(
                 self.width - offset,
