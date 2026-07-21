@@ -1,7 +1,11 @@
 # NEx_SDBM/items/backdrop.py
 
 try:
-    from PySide2.QtWidgets import QGraphicsItem
+    from PySide2.QtWidgets import (
+        QGraphicsItem,
+        QGraphicsTextItem,
+        QColorDialog
+    )
 
     from PySide2.QtGui import (
         QColor,
@@ -16,7 +20,11 @@ try:
     )
 
 except ImportError:
-    from PySide6.QtWidgets import QGraphicsItem
+    from PySide6.QtWidgets import (
+        QGraphicsItem,
+        QGraphicsTextItem,
+        QColorDialog
+    )
 
     from PySide6.QtGui import (
         QColor,
@@ -31,8 +39,95 @@ except ImportError:
     )
 
 
-import NEx_SDBM.ui.backdrop_editor as BdE
 import NEx_SDBM.core.node_editor as NEx
+
+
+class BackdropTitleEditor(QGraphicsTextItem):
+
+    def __init__(
+        self,
+        backdrop
+    ):
+        super().__init__(
+            backdrop
+        )
+
+        self.backdrop = backdrop
+
+        self.setPlainText(
+            backdrop.title
+        )
+
+        self.setTextInteractionFlags(
+            Qt.TextEditorInteraction
+        )
+
+        self.setDefaultTextColor(
+            QColor(
+                255,
+                255,
+                255
+            )
+        )
+
+        self.setZValue(
+            999
+        )
+
+        self.setPos(
+            8,
+            5
+        )
+
+        self.setTextWidth(
+            max(
+                50,
+                backdrop.width - 45
+            )
+        )
+
+    def focusOutEvent(
+        self,
+        event
+    ):
+
+        super().focusOutEvent(
+            event
+        )
+
+        self.backdrop.finish_title_edit(
+            commit=True
+        )
+
+    def keyPressEvent(
+        self,
+        event
+    ):
+
+        if event.key() in (
+            Qt.Key_Return,
+            Qt.Key_Enter
+        ):
+
+            self.backdrop.finish_title_edit(
+                commit=True
+            )
+
+            event.accept()
+            return
+
+        if event.key() == Qt.Key_Escape:
+
+            self.backdrop.finish_title_edit(
+                commit=False
+            )
+
+            event.accept()
+            return
+
+        super().keyPressEvent(
+            event
+        )
 
 
 class BackdropItem(QGraphicsItem):
@@ -63,6 +158,8 @@ class BackdropItem(QGraphicsItem):
         self._pressed = False
 
         self._multi_drag_start_positions = {}
+
+        self.title_editor = None
 
         self.title = title
 
@@ -139,6 +236,15 @@ class BackdropItem(QGraphicsItem):
     # -----------------------------------------------------
     # Rects
     # -----------------------------------------------------
+
+    def get_title_rect(self):
+
+        return QRectF(
+            8,
+            0,
+            self.width - 45,
+            self.header_height
+        )
 
     def get_close_rect(self):
 
@@ -252,7 +358,6 @@ class BackdropItem(QGraphicsItem):
         for item in self.get_selected_backdrops():
 
             try:
-
                 item.update_contained_nodes()
 
             except Exception:
@@ -384,6 +489,106 @@ class BackdropItem(QGraphicsItem):
             130
         )
 
+    def pick_backdrop_color(self):
+
+        picked_color = QColorDialog.getColor(
+            self.background_color,
+            None,
+            "Backdrop Color"
+        )
+
+        if not picked_color.isValid():
+            return
+
+        background_alpha = (
+            self.background_color.alpha()
+        )
+
+        header_alpha = (
+            self.header_color.alpha()
+        )
+
+        self.background_color = QColor(
+            picked_color.red(),
+            picked_color.green(),
+            picked_color.blue(),
+            background_alpha
+        )
+
+        header_color = QColor(
+            picked_color
+        ).darker(
+            160
+        )
+
+        header_color.setAlpha(
+            header_alpha
+        )
+
+        self.header_color = header_color
+
+        self.update()
+
+    # -----------------------------------------------------
+    # Title editing
+    # -----------------------------------------------------
+
+    def start_title_edit(self):
+
+        if self.title_editor:
+            return
+
+        self.title_editor = BackdropTitleEditor(
+            self
+        )
+
+        self.title_editor.setFocus()
+
+        self.update()
+
+    def finish_title_edit(
+        self,
+        commit=True
+    ):
+
+        if not self.title_editor:
+            return
+
+        editor = self.title_editor
+        self.title_editor = None
+
+        if commit:
+
+            new_title = (
+                editor
+                .toPlainText()
+                .strip()
+            )
+
+            if new_title:
+                self.title = new_title
+
+        scene = self.scene()
+
+        try:
+
+            editor.setParentItem(
+                None
+            )
+
+            if scene:
+                scene.removeItem(
+                    editor
+                )
+
+        except RuntimeError:
+            pass
+
+        except Exception:
+            pass
+
+        self.update()
+
     # -----------------------------------------------------
     # Deletion
     # -----------------------------------------------------
@@ -451,7 +656,6 @@ class BackdropItem(QGraphicsItem):
             event.pos()
         )
 
-        # Let Qt/Maya handle selection first.
         super().mousePressEvent(
             event
         )
@@ -548,11 +752,16 @@ class BackdropItem(QGraphicsItem):
         self._pressed = False
         self.update()
 
-        editor = BdE.BackdropEditor(
-            backdrop=self
-        )
+        if self.get_title_rect().contains(
+            event.pos()
+        ):
 
-        editor.exec_()
+            self.start_title_edit()
+
+            event.accept()
+            return
+
+        self.pick_backdrop_color()
 
         event.accept()
 
@@ -863,25 +1072,28 @@ class BackdropItem(QGraphicsItem):
             self.roundness
         )
 
-        font = painter.font()
-        font.setPointSize(14)
-        font.setBold(True)
-        painter.setFont(font)
+        if self.title_editor is None:
 
-        painter.drawText(
-            10,
-            25,
-            self.title
-        )
+            font = painter.font()
+            font.setPointSize(14)
+            font.setBold(True)
+            painter.setFont(font)
+
+            painter.drawText(
+                10,
+                25,
+                self.title
+            )
 
         close_rect = self.get_close_rect()
 
         painter.setBrush(
             QBrush(
                 QColor(
-                    120,
-                    30,
-                    30
+                    255,
+                    255,
+                    255,
+                    210
                 )
             )
         )
@@ -889,9 +1101,10 @@ class BackdropItem(QGraphicsItem):
         painter.setPen(
             QPen(
                 QColor(
-                    255,
-                    255,
-                    255
+                    40,
+                    40,
+                    40,
+                    180
                 ),
                 1
             )
@@ -899,8 +1112,8 @@ class BackdropItem(QGraphicsItem):
 
         painter.drawRoundedRect(
             close_rect,
-            4,
-            4
+            6,
+            6
         )
 
         painter.drawText(

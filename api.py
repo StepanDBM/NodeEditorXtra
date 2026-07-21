@@ -104,17 +104,19 @@ def create_backdrop_from_selection(title="New Group"):
 
 
 def clear_all_backdrops():
-    #with unDo("NEx Create Backdrop"):
-    backdrops = serializer.get_scene_backdrops()
-    removed = serializer.clear_backdrops(
-        backdrops
-    )
+
+    removed = serializer.clear_all_tab_backdrops()
 
     _NEX_ITEMS[:] = [
         item for item in _NEX_ITEMS
         if item not in removed
     ]
 
+    print(
+        "NEx | Cleared {} backdrop(s)".format(
+            len(removed)
+        )
+    )
 
 def get_default_nex_path():
     scene_path = cmds.file(
@@ -145,13 +147,12 @@ def get_default_nex_path():
 
 
 def save_all(filepath=None):
+
     if filepath is None:
         filepath = get_default_nex_path()
 
-    backdrops = serializer.get_scene_backdrops()
     return serializer.save_nex(
-        filepath,
-        backdrops
+        filepath
     )
 
 
@@ -170,7 +171,9 @@ def load_all(
         filepath
     )
 
-    _NEX_ITEMS.extend(created)
+    _NEX_ITEMS.extend(
+        created
+    )
 
     return created
 

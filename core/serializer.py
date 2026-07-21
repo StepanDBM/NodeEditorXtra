@@ -11,16 +11,11 @@ except ImportError:
     from PySide6.QtGui import QColor
 
 
-try:
-    import NEx_SDBM.core.node_editor as NEx
-    from NEx_SDBM.items.backdrop import BackdropItem
-
-except ImportError:
-    import core.node_editor as NEx
-    from items.backdrop import BackdropItem
+import NEx_SDBM.core.node_editor as NEx
+from NEx_SDBM.items.backdrop import BackdropItem
 
 
-NEX_VERSION = 1
+NEX_VERSION = 2
 
 
 # ---------------------------------------------------------
@@ -48,23 +43,16 @@ def is_backdrop_like(item):
     return True
 
 
-def get_scene_backdrops():
+def is_live_item(item):
 
-    scene = NEx.get_scene()
+    try:
+        return item.scene() is not None
 
-    backdrops = []
+    except RuntimeError:
+        return False
 
-    for item in scene.items():
-
-        if not is_backdrop_like(item):
-            continue
-
-        if not is_live_item(item):
-            continue
-
-        backdrops.append(item)
-
-    return backdrops
+    except Exception:
+        return False
 
 
 def normalize_filepath(filepath):
@@ -124,40 +112,64 @@ def color_from_data(data, fallback=None):
         return QColor(fallback)
 
 
-def is_live_item(item):
+# ---------------------------------------------------------
+# Backdrop Collection
+# ---------------------------------------------------------
 
-    try:
-        return item.scene() is not None
+def get_scene_backdrops(scene=None):
 
-    except RuntimeError:
-        return False
+    if scene is None:
+        scene = NEx.get_scene()
 
-    except Exception:
-        return False
+    backdrops = []
 
+    for item in scene.items():
 
-def get_live_backdrops(backdrops):
-
-    live = []
-
-    for backdrop in backdrops:
-
-        if not is_backdrop_like(backdrop):
+        if not is_backdrop_like(item):
             continue
 
-        if not is_live_item(backdrop):
+        if not is_live_item(item):
             continue
 
-        live.append(backdrop)
+        backdrops.append(
+            item
+        )
 
-    return live
+    return backdrops
+
+
+def get_all_tab_backdrops():
+
+    result = []
+
+    for tab_index, scene in NEx.iter_tab_scenes():
+
+        tab_info = NEx.get_tab_info(
+            tab_index
+        )
+
+        for backdrop in get_scene_backdrops(
+            scene
+        ):
+
+            result.append(
+                (
+                    backdrop,
+                    tab_info
+                )
+            )
+
+    return result
 
 
 # ---------------------------------------------------------
 # Serialization
 # ---------------------------------------------------------
 
-def serialize_backdrop(backdrop):
+def serialize_backdrop(
+    backdrop,
+    tab_info
+):
 
     if hasattr(
         backdrop,
@@ -173,6 +185,12 @@ def serialize_backdrop(backdrop):
     return {
 
         "type": "BackdropItem",
+
+        "tab": {
+            "index": tab_info["index"],
+            "name": tab_info["name"],
+            "key": tab_info["key"]
+        },
 
         "title": backdrop.title,
 
@@ -218,29 +236,34 @@ def serialize_backdrop(backdrop):
     }
 
 
-def serialize_backdrops(backdrops):
+def build_data():
 
-    return [
-        serialize_backdrop(
-            backdrop
+    tabs = {}
+
+    for backdrop, tab_info in get_all_tab_backdrops():
+
+        tab_name = tab_info["name"]
+
+        if tab_name not in tabs:
+
+            tabs[tab_name] = {
+                "index": tab_info["index"],
+                "name": tab_info["name"],
+                "key": tab_info["key"],
+                "backdrops": []
+            }
+
+        tabs[tab_name]["backdrops"].append(
+            serialize_backdrop(
+                backdrop,
+                tab_info
+            )
         )
-        for backdrop in get_live_backdrops(
-            backdrops
-        )
-    ]
-
-
-def build_data(backdrops):
 
     return {
-
         "format": "NEx",
-
         "version": NEX_VERSION,
-
-        "backdrops": serialize_backdrops(
-            backdrops
-        )
+        "tabs": tabs
     }
 
 
@@ -248,15 +271,13 @@ def build_data(backdrops):
 # Save
 # ---------------------------------------------------------
 
-def save_nex(filepath, backdrops):
+def save_nex(filepath):
 
     filepath = normalize_filepath(
         filepath
     )
 
-    data = build_data(
-        backdrops
-    )
+    data = build_data()
 
     folder = os.path.dirname(
         filepath
@@ -335,17 +356,10 @@ def read_nex(filepath):
 # Deserialization
 # ---------------------------------------------------------
 
-def create_backdrop_from_data(data):
-
-    title = data.get(
-        "title",
-        "Backdrop"
-    )
-
-    size_data = data.get(
-        "size",
-        {}
-    )
+def apply_backdrop_data(
+    backdrop,
+    data
+):
 
     position_data = data.get(
         "position",
@@ -355,22 +369,6 @@ def create_backdrop_from_data(data):
     style_data = data.get(
         "style",
         {}
-    )
-
-    width = size_data.get(
-        "width",
-        300
-    )
-
-    height = size_data.get(
-        "height",
-        180
-    )
-
-    backdrop = BackdropItem(
-        title=title,
-        width=width,
-        height=height
     )
 
     backdrop.setPos(
@@ -429,39 +427,133 @@ def create_backdrop_from_data(data):
         )
     )
 
-    scene = NEx.get_scene()
+    backdrop.update()
+
+
+def create_backdrop_from_data(
+    data,
+    scene
+):
+
+    title = data.get(
+        "title",
+        "Backdrop"
+    )
+
+    size_data = data.get(
+        "size",
+        {}
+    )
+
+    width = size_data.get(
+        "width",
+        300
+    )
+
+    height = size_data.get(
+        "height",
+        180
+    )
+
+    backdrop = BackdropItem(
+        title=title,
+        width=width,
+        height=height
+    )
+
+    apply_backdrop_data(
+        backdrop,
+        data
+    )
 
     scene.addItem(
         backdrop
     )
 
-    backdrop.update()
-
     return backdrop
 
 
-def load_backdrops_from_data(data):
+def load_tabs_from_data(data):
 
     created = []
 
-    for backdrop_data in data.get(
-        "backdrops",
-        []
-    ):
+    tabs = data.get(
+        "tabs",
+        {}
+    )
 
-        if backdrop_data.get(
-            "type"
-        ) != "BackdropItem":
+    # Old version fallback.
+    if not tabs:
+
+        scene = NEx.get_scene()
+
+        for backdrop_data in data.get(
+            "backdrops",
+            []
+        ):
+
+            if backdrop_data.get(
+                "type"
+            ) != "BackdropItem":
+                continue
+
+            created.append(
+                create_backdrop_from_data(
+                    backdrop_data,
+                    scene
+                )
+            )
+
+        return created
+
+    for saved_tab_name, tab_data in tabs.items():
+
+        tab_info = NEx.find_tab_info_by_name(
+            saved_tab_name
+        )
+
+        if not tab_info:
+
+            print(
+                "NEx | Could not load tab. Existing tab not found:",
+                saved_tab_name
+            )
 
             continue
 
-        backdrop = create_backdrop_from_data(
-            backdrop_data
-        )
+        try:
 
-        created.append(
-            backdrop
-        )
+            scene = NEx.get_scene_for_tab_index(
+                tab_info["index"]
+            )
+
+        except Exception as error:
+
+            print(
+                "NEx | Could not get scene for tab:",
+                saved_tab_name,
+                "|",
+                error
+            )
+
+            continue
+
+        for backdrop_data in tab_data.get(
+            "backdrops",
+            []
+        ):
+
+            if backdrop_data.get(
+                "type"
+            ) != "BackdropItem":
+                continue
+
+            created.append(
+                create_backdrop_from_data(
+                    backdrop_data,
+                    scene
+                )
+            )
 
     return created
 
@@ -472,7 +564,7 @@ def load_nex(filepath):
         filepath
     )
 
-    created = load_backdrops_from_data(
+    created = load_tabs_from_data(
         data
     )
 
@@ -502,13 +594,19 @@ def clear_backdrops(backdrops):
             scene = backdrop.scene()
 
             if scene:
-                scene.removeItem(backdrop)
+                scene.removeItem(
+                    backdrop
+                )
 
-            removed.append(backdrop)
+            removed.append(
+                backdrop
+            )
 
         except RuntimeError:
 
-            removed.append(backdrop)
+            removed.append(
+                backdrop
+            )
 
         except Exception as error:
 
@@ -516,5 +614,24 @@ def clear_backdrops(backdrops):
                 "NEx | Failed to clear backdrop:",
                 error
             )
+
+    return removed
+
+
+def clear_all_tab_backdrops():
+
+    removed = []
+
+    for tab_index, scene in NEx.iter_tab_scenes():
+
+        backdrops = get_scene_backdrops(
+            scene
+        )
+
+        removed.extend(
+            clear_backdrops(
+                backdrops
+            )
+        )
 
     return removed
