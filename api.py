@@ -10,11 +10,50 @@ from NEx_SDBM.core.utilities import undoChunk as unDo
 
 _NEX_ITEMS = []
 
+# api.py selection-related replacements
+
 def clear_nex_selection():
 
-    import NEx_SDBM.core.nex_selection as NExSelection
+    scene = NEx.get_scene()
 
-    NExSelection.clear_selection()
+    scene.clearSelection()
+
+
+def delete_selected_backdrops():
+
+    scene = NEx.get_scene()
+
+    selected = scene.selectedItems()
+
+    deleted_count = 0
+
+    for item in list(selected):
+
+        if not serializer.is_backdrop_like(item):
+            continue
+
+        try:
+            scene.removeItem(item)
+
+            try:
+                _NEX_ITEMS.remove(item)
+
+            except ValueError:
+                pass
+
+            deleted_count += 1
+
+        except RuntimeError:
+            deleted_count += 1
+
+        except Exception:
+            pass
+
+    print(
+        "NEx | Deleted {} backdrop(s)".format(
+            deleted_count
+        )
+    )
 
 
 def create_backdrop(title="First Prototype"):
@@ -62,54 +101,6 @@ def create_backdrop_from_selection(title="New Group"):
     _NEX_ITEMS.append(backdrop)
 
     return backdrop
-
-
-def delete_selected_backdrops():
-
-    import NEx_SDBM.core.nex_selection as NExSelection
-
-    selected = (
-        NExSelection.get_selected_backdrops()
-    )
-
-    deleted_count = 0
-
-    if selected:
-
-        for item in list(selected):
-
-            try:
-                scene = item.scene()
-
-                if scene:
-                    scene.removeItem(item)
-
-                try:
-                    _NEX_ITEMS.remove(item)
-                except ValueError:
-                    pass
-
-                deleted_count += 1
-
-            except RuntimeError:
-                deleted_count += 1
-
-            except Exception:
-                pass
-
-        NExSelection.clear_selection()
-
-    else:
-
-        print(
-            "NEx | No selected NEx backdrops."
-        )
-
-    print(
-        "NEx | Deleted {} backdrop(s)".format(
-            deleted_count
-        )
-    )
 
 
 def clear_all_backdrops():

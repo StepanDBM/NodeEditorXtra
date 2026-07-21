@@ -1,4 +1,7 @@
+# NEx_SDBM/core/node_editor.py
+
 from maya import OpenMayaUI
+
 
 try:
     from shiboken2 import wrapInstance
@@ -65,27 +68,100 @@ def get_scene():
 
 def get_node_name(item):
 
-    for child in item.childItems():
+    if is_nex_item(item):
+        return None
+
+    try:
+        children = item.childItems()
+
+    except RuntimeError:
+        return None
+
+    except Exception:
+        return None
+
+    for child in children:
 
         try:
             return child.text()
 
-        except:
+        except Exception:
             continue
 
     return None
+
+
+def is_nex_item(item):
+
+    return bool(
+        getattr(
+            item,
+            "nex_item_type",
+            None
+        )
+    )
+
+
+def is_nex_backdrop(item):
+
+    return (
+        getattr(
+            item,
+            "nex_item_type",
+            None
+        )
+        == "backdrop"
+    )
+
+
+def get_selected_items():
+
+    scene = get_scene()
+
+    return scene.selectedItems()
+
+
+def get_selected_node_items():
+
+    node_items = []
+
+    for item in get_selected_items():
+
+        name = get_node_name(
+            item
+        )
+
+        if name:
+            node_items.append(
+                item
+            )
+
+    return node_items
+
+
+def get_selected_backdrops():
+
+    return [
+        item
+        for item in get_selected_items()
+        if is_nex_backdrop(item)
+    ]
 
 
 def get_selected_node_names():
 
     names = []
 
-    for item in get_selected_items():
+    for item in get_selected_node_items():
 
-        name = get_node_name(item)
+        name = get_node_name(
+            item
+        )
 
         if name:
-            names.append(name)
+            names.append(
+                name
+            )
 
     return names
 
@@ -112,7 +188,9 @@ def get_scene_node_map():
 
     for item in scene.items():
 
-        name = get_node_name(item)
+        name = get_node_name(
+            item
+        )
 
         if name:
             mapping[name] = item
@@ -120,16 +198,9 @@ def get_scene_node_map():
     return mapping
 
 
-def get_selected_items():
-
-    scene = get_scene()
-
-    return scene.selectedItems()
-
-
 def get_selection_bounds():
 
-    selected = get_selected_items()
+    selected = get_selected_node_items()
 
     if not selected:
         return None
@@ -155,7 +226,20 @@ def move_nodes(
 
     for node_name in node_names:
 
-        item = node_map.get(node_name)
+        item = node_map.get(
+            node_name
+        )
 
         if item:
-            item.moveBy(dx, dy)
+
+            try:
+                item.moveBy(
+                    dx,
+                    dy
+                )
+
+            except RuntimeError:
+                pass
+
+            except Exception:
+                pass

@@ -1,8 +1,7 @@
+# NEx_SDBM/items/backdrop.py
+
 try:
-    from PySide2.QtWidgets import (
-        QGraphicsItem,
-        QApplication
-    )
+    from PySide2.QtWidgets import QGraphicsItem
 
     from PySide2.QtGui import (
         QColor,
@@ -17,10 +16,7 @@ try:
     )
 
 except ImportError:
-    from PySide6.QtWidgets import (
-        QGraphicsItem,
-        QApplication
-    )
+    from PySide6.QtWidgets import QGraphicsItem
 
     from PySide6.QtGui import (
         QColor,
@@ -37,7 +33,6 @@ except ImportError:
 
 import NEx_SDBM.ui.backdrop_editor as BdE
 import NEx_SDBM.core.node_editor as NEx
-import NEx_SDBM.core.nex_selection as NExSelection
 
 
 class BackdropItem(QGraphicsItem):
@@ -50,16 +45,7 @@ class BackdropItem(QGraphicsItem):
     ):
         super().__init__()
 
-        # -------------------------------------------------
-        # NEx identity / selection
-        # -------------------------------------------------
-
         self.nex_item_type = "backdrop"
-        self.nex_selected = False
-
-        # -------------------------------------------------
-        # Interaction state
-        # -------------------------------------------------
 
         self._x_pressed = False
 
@@ -77,10 +63,6 @@ class BackdropItem(QGraphicsItem):
         self._pressed = False
 
         self._multi_drag_start_positions = {}
-
-        # -------------------------------------------------
-        # Data
-        # -------------------------------------------------
 
         self.title = title
 
@@ -115,21 +97,14 @@ class BackdropItem(QGraphicsItem):
             0
         )
 
-        # -------------------------------------------------
-        # Qt flags
-        # -------------------------------------------------
-
         self.setFlag(
             QGraphicsItem.ItemIsMovable,
             False
         )
 
-        # IMPORTANT:
-        # Maya/Qt selection is disabled for NEx backdrops.
-        # We use NExSelection instead.
         self.setFlag(
             QGraphicsItem.ItemIsSelectable,
-            False
+            True
         )
 
         self.setFlag(
@@ -139,6 +114,11 @@ class BackdropItem(QGraphicsItem):
 
         self.setAcceptHoverEvents(
             True
+        )
+
+        self.setAcceptedMouseButtons(
+            Qt.LeftButton
+            | Qt.RightButton
         )
 
         self.close_size = 20
@@ -195,6 +175,15 @@ class BackdropItem(QGraphicsItem):
             pos
         )
 
+    def is_inside_backdrop(
+        self,
+        pos
+    ):
+
+        return self.boundingRect().contains(
+            pos
+        )
+
     def get_resize_edge(
         self,
         pos
@@ -224,6 +213,50 @@ class BackdropItem(QGraphicsItem):
             return "bottom"
 
         return None
+
+    # -----------------------------------------------------
+    # Selection helpers
+    # -----------------------------------------------------
+
+    def is_backdrop_item(
+        self,
+        item
+    ):
+
+        return (
+            getattr(
+                item,
+                "nex_item_type",
+                None
+            )
+            == "backdrop"
+        )
+
+    def get_selected_backdrops(self):
+
+        scene = self.scene()
+
+        if not scene:
+            return []
+
+        return [
+            item
+            for item in scene.selectedItems()
+            if self.is_backdrop_item(item)
+        ]
+
+    def cache_multi_drag_positions(self):
+
+        self._multi_drag_start_positions = {}
+
+        for item in self.get_selected_backdrops():
+
+            if item is self:
+                continue
+
+            self._multi_drag_start_positions[item] = (
+                item.pos()
+            )
 
     # -----------------------------------------------------
     # Color helpers
@@ -329,7 +362,7 @@ class BackdropItem(QGraphicsItem):
         if self._pressed:
             return self.get_pressed_selection_color()
 
-        if self.nex_selected:
+        if self.isSelected():
             return self.get_soft_selection_color()
 
         color = self.clone_color(
@@ -349,10 +382,6 @@ class BackdropItem(QGraphicsItem):
     # -----------------------------------------------------
 
     def delete_self(self):
-
-        NExSelection.deselect_item(
-            self
-        )
 
         scene = self.scene()
 
@@ -386,41 +415,6 @@ class BackdropItem(QGraphicsItem):
             self.delete_self()
 
     # -----------------------------------------------------
-    # Selection
-    # -----------------------------------------------------
-
-    def select_from_event(
-        self,
-        event,
-        allow_toggle=True
-    ):
-
-        modifiers = QApplication.keyboardModifiers()
-
-        additive = bool(
-            modifiers & Qt.ShiftModifier
-        )
-
-        if additive and allow_toggle:
-
-            was_selected = NExSelection.is_selected(
-                self
-            )
-
-            NExSelection.toggle_item(
-                self
-            )
-
-            return not was_selected
-
-        NExSelection.select_item(
-            self,
-            additive=False
-        )
-
-        return True
-
-    # -----------------------------------------------------
     # Mouse events
     # -----------------------------------------------------
 
@@ -442,12 +436,20 @@ class BackdropItem(QGraphicsItem):
             event.pos()
         )
 
-        if edge:
+        inside_header = self.is_in_drag_area(
+            event.pos()
+        )
 
-            self.select_from_event(
-                event,
-                allow_toggle=False
-            )
+        inside_backdrop = self.is_inside_backdrop(
+            event.pos()
+        )
+
+        # Let Qt/Maya handle selection first.
+        super().mousePressEvent(
+            event
+        )
+
+        if edge:
 
             self._resizing = True
             self._resize_edge = edge
@@ -464,35 +466,10 @@ class BackdropItem(QGraphicsItem):
 
         if self._x_pressed:
 
-            # Do not toggle multi-selection on X.
-            # X deletes only this backdrop.
-            if not NExSelection.is_selected(
-                self
-            ):
-                NExSelection.select_item(
-                    self,
-                    additive=False
-                )
-
             event.accept()
             return
 
-        if self.is_in_drag_area(
-            event.pos()
-        ):
-
-            should_start_drag = self.select_from_event(
-                event,
-                allow_toggle=True
-            )
-
-            if not should_start_drag:
-
-                self._pressed = False
-                self.update()
-
-                event.accept()
-                return
+        if inside_header:
 
             self.update_contained_nodes()
 
@@ -506,22 +483,15 @@ class BackdropItem(QGraphicsItem):
 
             self._dragging = False
 
-            selected_backdrops = (
-                NExSelection.get_selected_backdrops()
-            )
-
-            self._multi_drag_start_positions = {
-                item: item.pos()
-                for item in selected_backdrops
-                if item is not self
-            }
+            self.cache_multi_drag_positions()
 
             event.accept()
             return
 
-        super().mousePressEvent(
-            event
-        )
+        if inside_backdrop:
+
+            event.accept()
+            return
 
     def mouseReleaseEvent(
         self,
@@ -666,14 +636,12 @@ class BackdropItem(QGraphicsItem):
             new_pos
         )
 
-        # The actively dragged backdrop moves its Maya nodes.
         NEx.move_nodes(
             self.contained_nodes,
             move_delta.x(),
             move_delta.y()
         )
 
-        # Other selected NEx backdrops move visually only.
         for item, start_pos in self._multi_drag_start_positions.items():
 
             try:
@@ -832,7 +800,7 @@ class BackdropItem(QGraphicsItem):
         if self._pressed:
             border_width = 3
 
-        elif self.nex_selected:
+        elif self.isSelected():
             border_width = 3
 
         painter.setBrush(

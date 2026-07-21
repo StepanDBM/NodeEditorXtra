@@ -1,10 +1,9 @@
-# NEx_SDBM/NEx_bootstrap.py
+# NEx_bootstrap.py
 
 import importlib
 
 
 MODULES = [
-    "NEx_SDBM.core.nex_selection",
     "NEx_SDBM.core.node_editor",
     "NEx_SDBM.core.serializer",
 
