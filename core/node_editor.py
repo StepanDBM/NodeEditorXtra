@@ -734,6 +734,53 @@ def get_selected_backdrops():
         if is_nex_backdrop(item)
     ]
 
+def get_selected_backdrop_items():
+
+    return [
+        item
+        for item in get_selected_items()
+        if is_nex_backdrop(item)
+    ]
+
+
+def get_bounds_from_items(items):
+
+    valid_items = []
+
+    for item in items:
+
+        try:
+            item.sceneBoundingRect()
+            valid_items.append(
+                item
+            )
+
+        except RuntimeError:
+            continue
+
+        except Exception:
+            continue
+
+    if not valid_items:
+        return None
+
+    bounds = valid_items[0].sceneBoundingRect()
+
+    for item in valid_items[1:]:
+
+        bounds = bounds.united(
+            item.sceneBoundingRect()
+        )
+
+    return bounds
+
+
+def get_selected_backdrop_bounds():
+
+    return get_bounds_from_items(
+        get_selected_backdrop_items()
+    )
+
 
 def get_selected_node_names():
 
@@ -755,20 +802,9 @@ def get_selected_node_names():
 
 def get_selection_bounds():
 
-    selected = get_selected_node_items()
-
-    if not selected:
-        return None
-
-    bounds = selected[0].sceneBoundingRect()
-
-    for item in selected[1:]:
-
-        bounds = bounds.united(
-            item.sceneBoundingRect()
-        )
-
-    return bounds
+    return get_bounds_from_items(
+        get_selected_node_items()
+    )
 
 
 # ---------------------------------------------------------

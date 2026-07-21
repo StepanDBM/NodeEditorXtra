@@ -69,13 +69,42 @@ def create_backdrop(title="First Prototype"):
 
 
 def create_backdrop_from_selection(title="New Group"):
-    #with unDo("NEx Create Backdrop"):
-    bounds = NEx.get_selection_bounds()
 
-    if not bounds:
-        raise RuntimeError("Nothing selected.")
+    node_bounds = NEx.get_selection_bounds()
+
+    selected_backdrops = (
+        NEx.get_selected_backdrop_items()
+    )
+
+    backdrop_bounds = (
+        NEx.get_selected_backdrop_bounds()
+    )
 
     padding = 40
+
+    if node_bounds:
+
+        bounds = node_bounds
+
+        contained_nodes = (
+            NEx.get_selected_node_names()
+        )
+
+        child_backdrops = []
+
+    elif backdrop_bounds:
+
+        bounds = backdrop_bounds
+
+        contained_nodes = []
+
+        child_backdrops = selected_backdrops
+
+    else:
+
+        raise RuntimeError(
+            "Nothing selected."
+        )
 
     width = bounds.width() + (padding * 2)
     height = bounds.height() + (padding * 2)
@@ -87,18 +116,41 @@ def create_backdrop_from_selection(title="New Group"):
     )
 
     scene = NEx.get_scene()
-    scene.addItem(backdrop)
+
+    scene.addItem(
+        backdrop
+    )
 
     backdrop.setPos(
         bounds.left() - padding,
         bounds.top() - padding
     )
 
-    backdrop.contained_nodes = (
-        NEx.get_selected_node_names()
-    )
+    backdrop.contained_nodes = contained_nodes
 
-    _NEX_ITEMS.append(backdrop)
+    # If this is a parent backdrop, put it visually behind the selected children.
+    if child_backdrops:
+
+        try:
+
+            min_z = min(
+                child.zValue()
+                for child in child_backdrops
+            )
+
+            backdrop.setZValue(
+                min_z - 1
+            )
+
+        except Exception:
+
+            backdrop.setZValue(
+                -1
+            )
+
+    _NEX_ITEMS.append(
+        backdrop
+    )
 
     return backdrop
 

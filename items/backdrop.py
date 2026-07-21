@@ -159,6 +159,10 @@ class BackdropItem(QGraphicsItem):
 
         self._multi_drag_start_positions = {}
 
+        self._drag_roots = []
+        self._drag_tree = {}
+        self._last_drag_delta = None
+
         self.title_editor = None
 
         self.title = title
@@ -222,6 +226,321 @@ class BackdropItem(QGraphicsItem):
         self.close_padding = 8
 
     # -----------------------------------------------------
+    # Hierarchy helpers
+    # -----------------------------------------------------
+
+    def get_scene_backdrops(self):
+
+        scene = self.scene()
+
+        if not scene:
+            return []
+
+        return [
+            item
+            for item in scene.items()
+            if self.is_backdrop_item(item)
+        ]
+
+
+    def get_backdrop_area(self):
+
+        return float(
+            self.width
+            * self.height
+        )
+
+
+    def contains_scene_rect(
+        self,
+        scene_rect
+    ):
+
+        try:
+
+            return self.sceneBoundingRect().contains(
+                scene_rect
+            )
+
+        except RuntimeError:
+            return False
+
+        except Exception:
+            return False
+
+
+    def find_smallest_owner_for_rect(
+        self,
+        scene_rect
+    ):
+
+        candidates = []
+
+        for backdrop in self.get_scene_backdrops():
+
+            if backdrop.contains_scene_rect(
+                scene_rect
+            ):
+
+                candidates.append(
+                    backdrop
+                )
+
+        if not candidates:
+            return None
+
+        candidates = sorted(
+            candidates,
+            key=lambda item: item.get_backdrop_area()
+        )
+
+        return candidates[0]
+
+
+    def get_parent_backdrop(self):
+
+        my_rect = self.sceneBoundingRect()
+
+        candidates = []
+
+        for backdrop in self.get_scene_backdrops():
+
+            if backdrop is self:
+                continue
+
+            if backdrop.contains_scene_rect(
+                my_rect
+            ):
+
+                candidates.append(
+                    backdrop
+                )
+
+        if not candidates:
+            return None
+
+        candidates = sorted(
+            candidates,
+            key=lambda item: item.get_backdrop_area()
+        )
+
+        return candidates[0]
+
+
+    def get_direct_child_backdrops(self):
+
+        children = []
+
+        for backdrop in self.get_scene_backdrops():
+
+            if backdrop is self:
+                continue
+
+            parent = backdrop.get_parent_backdrop()
+
+            if parent is self:
+
+                children.append(
+                    backdrop
+                )
+
+        return children
+
+
+    def get_direct_node_names(self):
+
+        direct_nodes = []
+
+        scene_map = NEx.get_scene_node_map()
+
+        for node_name, item in scene_map.items():
+
+            try:
+
+                node_rect = item.sceneBoundingRect()
+
+            except RuntimeError:
+                continue
+
+            except Exception:
+                continue
+
+            owner = self.find_smallest_owner_for_rect(
+                node_rect
+            )
+
+            if owner is self:
+
+                direct_nodes.append(
+                    node_name
+                )
+
+        return direct_nodes
+
+
+    def update_direct_contents(self):
+
+        self.contained_nodes = (
+            self.get_direct_node_names()
+        )
+
+        self.child_backdrops = (
+            self.get_direct_child_backdrops()
+        )
+
+    # -----------------------------------------------------
+    # Drag-tree helpers
+    # -----------------------------------------------------
+    def is_descendant_of(
+        self,
+        possible_parent
+    ):
+
+        parent = self.get_parent_backdrop()
+
+        while parent:
+
+            if parent is possible_parent:
+                return True
+
+            parent = parent.get_parent_backdrop()
+
+        return False
+
+
+    def filter_top_level_backdrops(
+        self,
+        backdrops
+    ):
+
+        roots = []
+
+        for backdrop in backdrops:
+
+            has_selected_parent = False
+
+            for other in backdrops:
+
+                if other is backdrop:
+                    continue
+
+                if backdrop.is_descendant_of(
+                    other
+                ):
+
+                    has_selected_parent = True
+                    break
+
+            if not has_selected_parent:
+
+                roots.append(
+                    backdrop
+                )
+
+        return roots
+
+
+    def cache_subtree_for_drag(
+        self,
+        backdrop
+    ):
+
+        if backdrop in self._drag_tree:
+            return
+
+        backdrop.update_direct_contents()
+
+        children = list(
+            getattr(
+                backdrop,
+                "child_backdrops",
+                []
+            )
+        )
+
+        self._drag_tree[backdrop] = {
+            "start_pos": backdrop.pos(),
+            "nodes": list(
+                getattr(
+                    backdrop,
+                    "contained_nodes",
+                    []
+                )
+            ),
+            "children": children
+        }
+
+        for child in children:
+
+            self.cache_subtree_for_drag(
+                child
+            )
+
+
+    def cache_multi_drag_positions(self):
+
+        selected_backdrops = (
+            self.get_selected_backdrops()
+        )
+
+        if self not in selected_backdrops:
+
+            selected_backdrops.append(
+                self
+            )
+
+        self._drag_roots = (
+            self.filter_top_level_backdrops(
+                selected_backdrops
+            )
+        )
+
+        self._drag_tree = {}
+
+        for root in self._drag_roots:
+
+            self.cache_subtree_for_drag(
+                root
+            )
+
+        self._last_drag_delta = None
+
+
+    def apply_subtree_drag_delta(
+        self,
+        backdrop,
+        total_delta,
+        incremental_delta
+    ):
+
+        data = self._drag_tree.get(
+            backdrop
+        )
+
+        if not data:
+            return
+
+        start_pos = data["start_pos"]
+
+        backdrop.setPos(
+            start_pos + total_delta
+        )
+
+        NEx.move_nodes(
+            data["nodes"],
+            incremental_delta.x(),
+            incremental_delta.y()
+        )
+
+        for child in data["children"]:
+
+            self.apply_subtree_drag_delta(
+                child,
+                total_delta,
+                incremental_delta
+            )
+
+    # -----------------------------------------------------
     # State
     # -----------------------------------------------------
 
@@ -232,6 +551,11 @@ class BackdropItem(QGraphicsItem):
         self._drag_start_pos = None
         self._x_pressed = False
         self._multi_drag_start_positions = {}
+
+        self._drag_roots = []
+        self._drag_tree = {}
+        self._last_drag_delta = None
+
 
     # -----------------------------------------------------
     # Rects
@@ -350,25 +674,6 @@ class BackdropItem(QGraphicsItem):
             for item in scene.selectedItems()
             if self.is_backdrop_item(item)
         ]
-
-    def cache_multi_drag_positions(self):
-
-        self._multi_drag_start_positions = {}
-
-        for item in self.get_selected_backdrops():
-
-            try:
-                item.update_contained_nodes()
-
-            except Exception:
-                pass
-
-            if item is self:
-                continue
-
-            self._multi_drag_start_positions[item] = (
-                item.pos()
-            )
 
     # -----------------------------------------------------
     # Color helpers
@@ -770,6 +1075,10 @@ class BackdropItem(QGraphicsItem):
         event
     ):
 
+        # -----------------------------------------------------
+        # Resize
+        # -----------------------------------------------------
+
         if self._resizing:
 
             delta = (
@@ -818,6 +1127,10 @@ class BackdropItem(QGraphicsItem):
             event.accept()
             return
 
+        # -----------------------------------------------------
+        # Drag
+        # -----------------------------------------------------
+
         if self._drag_start_mouse is None:
             return
 
@@ -838,48 +1151,27 @@ class BackdropItem(QGraphicsItem):
             - self._drag_start_mouse
         )
 
-        new_pos = (
-            self._drag_start_pos
-            + delta
-        )
+        if self._last_drag_delta is None:
 
-        move_delta = (
-            new_pos
-            - self.pos()
-        )
+            incremental_delta = delta
 
-        self.setPos(
-            new_pos
-        )
+        else:
 
-        NEx.move_nodes(
-            self.contained_nodes,
-            move_delta.x(),
-            move_delta.y()
-        )
+            incremental_delta = (
+                delta
+                - self._last_drag_delta
+            )
 
-        for item, start_pos in self._multi_drag_start_positions.items():
+        self._last_drag_delta = delta
+
+        for root in self._drag_roots:
 
             try:
 
-                target_pos = (
-                    start_pos
-                    + delta
-                )
-
-                item_move_delta = (
-                    target_pos
-                    - item.pos()
-                )
-
-                item.setPos(
-                    target_pos
-                )
-
-                NEx.move_nodes(
-                    item.contained_nodes,
-                    item_move_delta.x(),
-                    item_move_delta.y()
+                self.apply_subtree_drag_delta(
+                    root,
+                    delta,
+                    incremental_delta
                 )
 
             except RuntimeError:
@@ -983,23 +1275,7 @@ class BackdropItem(QGraphicsItem):
 
     def update_contained_nodes(self):
 
-        scene_map = NEx.get_scene_node_map()
-
-        self.contained_nodes = []
-
-        my_bounds = self.sceneBoundingRect()
-
-        for node_name, item in scene_map.items():
-
-            node_bounds = item.sceneBoundingRect()
-
-            if my_bounds.contains(
-                node_bounds
-            ):
-
-                self.contained_nodes.append(
-                    node_name
-                )
+        self.update_direct_contents()
 
     # -----------------------------------------------------
     # Paint
