@@ -163,6 +163,9 @@ class BackdropItem(QGraphicsItem):
         self._drag_tree = {}
         self._last_drag_delta = None
 
+        self.node_admission_margin = 40
+        self.node_capture_padding = 20
+
         self.title_editor = None
 
         self.title = title
@@ -171,6 +174,7 @@ class BackdropItem(QGraphicsItem):
         self.height = height
         self.header_height = 35
         self.roundness = 4
+
 
         self.background_color = QColor(
             70,
@@ -645,6 +649,138 @@ class BackdropItem(QGraphicsItem):
         return None
 
     # -----------------------------------------------------
+    # Grabbing new-commers Helpers
+    # -----------------------------------------------------
+    def auto_expand_drag_tree(self):
+
+        if not self._drag_tree:
+
+            self.auto_expand_to_capture_nearby_nodes()
+            return
+
+        backdrops = list(
+            self._drag_tree.keys()
+        )
+
+        backdrops = sorted(
+            backdrops,
+            key=lambda item: item.get_backdrop_area()
+        )
+
+        for backdrop in backdrops:
+
+            try:
+
+                backdrop.auto_expand_to_capture_nearby_nodes()
+
+            except RuntimeError:
+                pass
+
+            except Exception:
+                pass
+    def node_is_admissible(
+        self,
+        node_rect
+    ):
+
+        my_rect = self.sceneBoundingRect()
+
+        if my_rect.contains(
+            node_rect
+        ):
+            return False
+
+        intersection = my_rect.intersected(
+            node_rect
+        )
+
+        if intersection.isEmpty():
+            return False
+
+        return (
+            intersection.width() >= self.node_admission_margin
+            or
+            intersection.height() >= self.node_admission_margin
+        )
+
+
+    def auto_expand_to_capture_nearby_nodes(self):
+
+        scene_map = NEx.get_scene_node_map()
+
+        my_rect = self.sceneBoundingRect()
+
+        target_rect = QRectF(
+            my_rect
+        )
+
+        changed = False
+
+        for node_name, item in scene_map.items():
+
+            try:
+
+                node_rect = item.sceneBoundingRect()
+
+            except RuntimeError:
+                continue
+
+            except Exception:
+                continue
+
+            # If another smaller backdrop already owns this node,
+            # do not let this bigger backdrop steal it.
+            owner = self.find_smallest_owner_for_rect(
+                node_rect
+            )
+
+            if owner is not None and owner is not self:
+                continue
+
+            if not self.node_is_admissible(
+                node_rect
+            ):
+                continue
+
+            padded_node_rect = node_rect.adjusted(
+                -self.node_capture_padding,
+                -self.node_capture_padding,
+                self.node_capture_padding,
+                self.node_capture_padding
+            )
+
+            target_rect = target_rect.united(
+                padded_node_rect
+            )
+
+            changed = True
+
+        if not changed:
+            return False
+
+        self.prepareGeometryChange()
+
+        self.setPos(
+            target_rect.left(),
+            target_rect.top()
+        )
+
+        self.width = max(
+            100,
+            target_rect.width()
+        )
+
+        self.height = max(
+            60,
+            target_rect.height()
+        )
+
+        self.update_direct_contents()
+        self.update()
+
+        return True
+
+    # -----------------------------------------------------
     # Selection helpers
     # -----------------------------------------------------
 
@@ -1026,6 +1162,8 @@ class BackdropItem(QGraphicsItem):
             self._resizing = False
             self._resize_edge = None
 
+            self.auto_expand_to_capture_nearby_nodes()
+
             event.accept()
             return
 
@@ -1041,6 +1179,7 @@ class BackdropItem(QGraphicsItem):
             event.accept()
             return
 
+        self.auto_expand_drag_tree()
         self.clear_drag_state()
 
         super().mouseReleaseEvent(
