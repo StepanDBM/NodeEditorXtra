@@ -115,12 +115,6 @@ def clear_all_backdrops():
         if item not in removed
     ]
 
-    print(
-        "NEx | Cleared {} backdrop(s)".format(
-            len(removed)
-        )
-    )
-
 
 def get_default_nex_path():
     scene_path = cmds.file(

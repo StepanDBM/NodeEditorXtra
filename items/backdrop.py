@@ -251,6 +251,13 @@ class BackdropItem(QGraphicsItem):
 
         for item in self.get_selected_backdrops():
 
+            try:
+
+                item.update_contained_nodes()
+
+            except Exception:
+                pass
+
             if item is self:
                 continue
 
@@ -645,8 +652,25 @@ class BackdropItem(QGraphicsItem):
         for item, start_pos in self._multi_drag_start_positions.items():
 
             try:
+
+                target_pos = (
+                    start_pos
+                    + delta
+                )
+
+                item_move_delta = (
+                    target_pos
+                    - item.pos()
+                )
+
                 item.setPos(
-                    start_pos + delta
+                    target_pos
+                )
+
+                NEx.move_nodes(
+                    item.contained_nodes,
+                    item_move_delta.x(),
+                    item_move_delta.y()
                 )
 
             except RuntimeError:
