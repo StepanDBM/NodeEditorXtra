@@ -30,9 +30,8 @@ def show():
 
     try:
 
-        import NEx_SDBM.core.node_editor as NEx
-
-        NEx.install_nex_focus_filter()
+    import NEx_SDBM.core.scene_view as scene_view
+    scene_view.install_nex_focus_filter()
 
     except Exception as error:
 
