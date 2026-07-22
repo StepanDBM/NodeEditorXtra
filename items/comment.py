@@ -1,19 +1,17 @@
-# TODO# NEx_SDBM/items/comment.py
+# NEx_SDBM/items/comment.py
 
 try:
     from PySide2.QtWidgets import (
-        QGraphicsItem,
-        QGraphicsTextItem,
-        QColorDialog
+        QGraphicsTextItem
     )
-
     from PySide2.QtGui import (
         QColor,
         QBrush,
         QPen,
-        QPainter
+        QPainter,
+        QTextDocument,
+        QTextOption
     )
-
     from PySide2.QtCore import (
         QRectF,
         Qt
@@ -21,22 +19,27 @@ try:
 
 except ImportError:
     from PySide6.QtWidgets import (
-        QGraphicsItem,
-        QGraphicsTextItem,
-        QColorDialog
+        QGraphicsTextItem
     )
 
     from PySide6.QtGui import (
         QColor,
         QBrush,
         QPen,
-        QPainter
+        QPainter,
+        QTextDocument,
+        QTextOption
     )
 
     from PySide6.QtCore import (
         QRectF,
         Qt
     )
+
+
+from NEx_SDBM.items.nex_item import (
+    NExGraphicsItem
+)
 
 
 class CommentTextEditor(QGraphicsTextItem):
@@ -82,18 +85,21 @@ class CommentTextEditor(QGraphicsTextItem):
                 comment.width - 20
             )
         )
+        self.document().setDefaultTextOption(
+            comment.get_text_option()
+        )
 
     def focusOutEvent(
         self,
         event
     ):
 
-        super().focusOutEvent(
-            event
-        )
-
         self.comment.finish_text_edit(
             commit=True
+        )
+
+        super().focusOutEvent(
+            event
         )
 
     def keyPressEvent(
@@ -115,7 +121,7 @@ class CommentTextEditor(QGraphicsTextItem):
         )
 
 
-class CommentItem(QGraphicsItem):
+class CommentItem(NExGraphicsItem):
 
     def __init__(
         self,
@@ -123,14 +129,18 @@ class CommentItem(QGraphicsItem):
         width=240,
         height=120
     ):
-        super().__init__()
+        super().__init__(
+            width=width,
+            height=height
+        )
 
         self.nex_item_type = "comment"
+        self.nex_parentable = True
+        self.nex_container = False
 
         self.text = text
+        self.text_editor = None
 
-        self.width = width
-        self.height = height
         self.roundness = 8
 
         self.background_color = QColor(
@@ -154,54 +164,23 @@ class CommentItem(QGraphicsItem):
             240
         )
 
-        self._hovered = False
-        self._pressed = False
-
-        self._dragging = False
-        self._drag_start_mouse = None
-        self._drag_start_pos = None
-
-        self.text_editor = None
-
-        self.setFlag(
-            QGraphicsItem.ItemIsMovable,
-            False
-        )
-
-        self.setFlag(
-            QGraphicsItem.ItemIsSelectable,
-            True
-        )
-
-        self.setFlag(
-            QGraphicsItem.ItemIsFocusable,
-            True
-        )
-
-        self.setAcceptHoverEvents(
-            True
-        )
-
-        self.setAcceptedMouseButtons(
-            Qt.LeftButton
-            | Qt.RightButton
-        )
-
     # -----------------------------------------------------
-    # Geometry
+    # Size hook
     # -----------------------------------------------------
 
-    def boundingRect(self):
+    def on_size_changed(self):
 
-        return QRectF(
-            0,
-            0,
-            self.width,
-            self.height
-        )
+        if self.text_editor:
+
+            self.text_editor.setTextWidth(
+                max(
+                    60,
+                    self.width - 20
+                )
+            )
 
     # -----------------------------------------------------
-    # Color
+    # Color helpers
     # -----------------------------------------------------
 
     def clone_color(
@@ -223,11 +202,13 @@ class CommentItem(QGraphicsItem):
         )
 
         if self._pressed:
+
             return color.lighter(
                 145
             )
 
         if self._hovered:
+
             return color.lighter(
                 120
             )
@@ -243,28 +224,6 @@ class CommentItem(QGraphicsItem):
             return self.selected_border_color
 
         return self.border_color
-
-    def pick_color(self):
-
-        picked_color = QColorDialog.getColor(
-            self.background_color,
-            None,
-            "Comment Color"
-        )
-
-        if not picked_color.isValid():
-            return
-
-        alpha = self.background_color.alpha()
-
-        self.background_color = QColor(
-            picked_color.red(),
-            picked_color.green(),
-            picked_color.blue(),
-            alpha
-        )
-
-        self.update()
 
     # -----------------------------------------------------
     # Text editing
@@ -314,6 +273,7 @@ class CommentItem(QGraphicsItem):
             )
 
             if scene:
+
                 scene.removeItem(
                     editor
                 )
@@ -326,86 +286,31 @@ class CommentItem(QGraphicsItem):
 
         self.update()
 
+
+    def get_text_option(self):
+
+        option = QTextOption()
+
+        option.setWrapMode(
+            QTextOption.WrapAnywhere
+        )
+
+        option.setAlignment(
+            Qt.AlignJustify
+        )
+
+        return option
+
     # -----------------------------------------------------
     # Mouse events
     # -----------------------------------------------------
-
-    def mousePressEvent(
-        self,
-        event
-    ):
-
-        self._pressed = True
-        self.update()
-
-        super().mousePressEvent(
-            event
-        )
-
-        self._drag_start_mouse = (
-            event.scenePos()
-        )
-
-        self._drag_start_pos = (
-            self.pos()
-        )
-
-        self._dragging = False
-
-        event.accept()
-
-    def mouseReleaseEvent(
-        self,
-        event
-    ):
-
-        self._pressed = False
-        self.update()
-
-        self._dragging = False
-        self._drag_start_mouse = None
-        self._drag_start_pos = None
-
-        super().mouseReleaseEvent(
-            event
-        )
-
-    def mouseMoveEvent(
-        self,
-        event
-    ):
-
-        if self._drag_start_mouse is None:
-            return
-
-        if not self._dragging:
-
-            move_distance = (
-                event.scenePos()
-                - self._drag_start_mouse
-            ).manhattanLength()
-
-            if move_distance < 4:
-                return
-
-            self._dragging = True
-
-        delta = (
-            event.scenePos()
-            - self._drag_start_mouse
-        )
-
-        self.setPos(
-            self._drag_start_pos
-            + delta
-        )
-
-        event.accept()
 
     def mouseDoubleClickEvent(
         self,
         event
     ):
+
+        self.clear_interaction_state()
 
         self._pressed = False
         self.update()
@@ -450,9 +355,11 @@ class CommentItem(QGraphicsItem):
         )
 
         if result == edit_action:
+
             self.start_text_edit()
 
         elif result == color_action:
+
             self.pick_color()
 
         elif result == delete_action:
@@ -460,38 +367,10 @@ class CommentItem(QGraphicsItem):
             scene = self.scene()
 
             if scene:
+
                 scene.removeItem(
                     self
                 )
-
-    # -----------------------------------------------------
-    # Hover
-    # -----------------------------------------------------
-
-    def hoverEnterEvent(
-        self,
-        event
-    ):
-
-        self._hovered = True
-        self.update()
-
-        super().hoverEnterEvent(
-            event
-        )
-
-    def hoverLeaveEvent(
-        self,
-        event
-    ):
-
-        self._hovered = False
-        self._pressed = False
-        self.update()
-
-        super().hoverLeaveEvent(
-            event
-        )
 
     # -----------------------------------------------------
     # Paint
@@ -511,6 +390,7 @@ class CommentItem(QGraphicsItem):
         border_width = 2
 
         if self._pressed or self.isSelected():
+
             border_width = 3
 
         painter.setBrush(
@@ -554,8 +434,47 @@ class CommentItem(QGraphicsItem):
                 )
             )
 
-            painter.drawText(
-                text_rect,
-                Qt.TextWordWrap,
+            document = QTextDocument()
+
+            document.setPlainText(
                 self.text
             )
+
+            document.setDefaultFont(
+                font
+            )
+
+            document.setDefaultTextOption(
+                self.get_text_option()
+            )
+
+            document.setTextWidth(
+                text_rect.width()
+            )
+
+            painter.save()
+
+            painter.translate(
+                text_rect.topLeft()
+            )
+
+            painter.setClipRect(
+                QRectF(
+                    0,
+                    0,
+                    text_rect.width(),
+                    text_rect.height()
+                )
+            )
+
+            document.drawContents(
+                painter,
+                QRectF(
+                    0,
+                    0,
+                    text_rect.width(),
+                    text_rect.height()
+                )
+            )
+
+            painter.restore()

@@ -10,6 +10,7 @@ MODULES = [
 
     "NEx_SDBM.core.utilities.undoChunk",
 
+    "NEx_SDBM.items.nex_item",
     "NEx_SDBM.items.backdrop",
     "NEx_SDBM.items.comment",
     "NEx_SDBM.items.image",

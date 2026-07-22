@@ -2,9 +2,7 @@
 
 try:
     from PySide2.QtWidgets import (
-        QGraphicsItem,
-        QGraphicsTextItem,
-        QColorDialog
+        QGraphicsTextItem
     )
 
     from PySide2.QtGui import (
@@ -21,9 +19,7 @@ try:
 
 except ImportError:
     from PySide6.QtWidgets import (
-        QGraphicsItem,
-        QGraphicsTextItem,
-        QColorDialog
+        QGraphicsTextItem
     )
 
     from PySide6.QtGui import (
@@ -41,6 +37,10 @@ except ImportError:
 
 import NEx_SDBM.core.node_editor as NEx
 
+from NEx_SDBM.items.nex_item import (
+    NExGraphicsItem
+)
+
 
 class BackdropTitleEditor(QGraphicsTextItem):
 
@@ -54,13 +54,9 @@ class BackdropTitleEditor(QGraphicsTextItem):
 
         self.backdrop = backdrop
 
-        self.setPlainText(
-            backdrop.title
-        )
+        self.setPlainText(backdrop.title)
 
-        self.setTextInteractionFlags(
-            Qt.TextEditorInteraction
-        )
+        self.setTextInteractionFlags(Qt.TextEditorInteraction)
 
         self.setDefaultTextColor(
             QColor(
@@ -70,20 +66,12 @@ class BackdropTitleEditor(QGraphicsTextItem):
             )
         )
 
-        self.setZValue(
-            999
-        )
+        self.setZValue(999)
 
-        self.setPos(
-            8,
-            5
-        )
+        self.setPos(8,5)
 
         self.setTextWidth(
-            max(
-                50,
-                backdrop.width - 45
-            )
+            max(50, backdrop.width - 45)
         )
 
     def focusOutEvent(
@@ -91,12 +79,12 @@ class BackdropTitleEditor(QGraphicsTextItem):
         event
     ):
 
-        super().focusOutEvent(
-            event
-        )
-
         self.backdrop.finish_title_edit(
             commit=True
+        )
+
+        super().focusOutEvent(
+            event
         )
 
     def keyPressEvent(
@@ -130,7 +118,7 @@ class BackdropTitleEditor(QGraphicsTextItem):
         )
 
 
-class BackdropItem(QGraphicsItem):
+class BackdropItem(NExGraphicsItem):
 
     def __init__(
         self,
@@ -138,43 +126,30 @@ class BackdropItem(QGraphicsItem):
         width=300,
         height=180
     ):
-        super().__init__()
+        super().__init__(
+            width=width,
+            height=height
+        )
 
         self.nex_item_type = "backdrop"
-
-        self._x_pressed = False
-
-        self.contained_nodes = []
-
-        self._dragging = False
-        self._drag_start_mouse = None
-        self._drag_start_pos = None
-
-        self._resizing = False
-        self._resize_edge = None
-        self.resize_margin = 8
-
-        self._hovered = False
-        self._pressed = False
-
-        self._multi_drag_start_positions = {}
-
-        self._drag_roots = []
-        self._drag_tree = {}
-        self._last_drag_delta = None
-
-        self.node_admission_margin = 40
-        self.node_capture_padding = 20
-
-        self.title_editor = None
+        self.nex_parentable = True
+        self.nex_container = True
 
         self.title = title
+        self.title_editor = None
 
-        self.width = width
-        self.height = height
         self.header_height = 35
         self.roundness = 4
 
+        self.close_size = 20
+        self.close_padding = 8
+        self._x_pressed = False
+
+        self.contained_nodes = []
+        self.child_nex_items = []
+
+        self.capture_ratio = 0.51
+        self.node_capture_padding = 20
 
         self.background_color = QColor(
             70,
@@ -193,377 +168,49 @@ class BackdropItem(QGraphicsItem):
         self.border_color = QColor(
             70,
             150,
+            255,
             255
         )
 
         self.pressed_border_color = QColor(
             255,
             180,
-            0
+            0,
+            255
         )
 
-        self.setFlag(
-            QGraphicsItem.ItemIsMovable,
-            False
+        self.selected_border_color = QColor(
+            90,
+            255,
+            130,
+            240
         )
-
-        self.setFlag(
-            QGraphicsItem.ItemIsSelectable,
-            True
-        )
-
-        self.setFlag(
-            QGraphicsItem.ItemIsFocusable,
-            True
-        )
-
-        self.setAcceptHoverEvents(
-            True
-        )
-
-        self.setAcceptedMouseButtons(
-            Qt.LeftButton
-            | Qt.RightButton
-        )
-
-        self.close_size = 20
-        self.close_padding = 8
 
     # -----------------------------------------------------
-    # Hierarchy helpers
+    # Geometry / rects
     # -----------------------------------------------------
 
-    def get_scene_backdrops(self):
-
-        scene = self.scene()
-
-        if not scene:
-            return []
-
-        return [
-            item
-            for item in scene.items()
-            if self.is_backdrop_item(item)
-        ]
-
-
-    def get_backdrop_area(self):
-
-        return float(
-            self.width
-            * self.height
-        )
-
-
-    def contains_scene_rect(
+    def set_size(
         self,
-        scene_rect
+        width,
+        height
     ):
 
-        try:
+        self.prepareGeometryChange()
 
-            return self.sceneBoundingRect().contains(
-                scene_rect
-            )
-
-        except RuntimeError:
-            return False
-
-        except Exception:
-            return False
-
-
-    def find_smallest_owner_for_rect(
-        self,
-        scene_rect
-    ):
-
-        candidates = []
-
-        for backdrop in self.get_scene_backdrops():
-
-            if backdrop.contains_scene_rect(
-                scene_rect
-            ):
-
-                candidates.append(
-                    backdrop
-                )
-
-        if not candidates:
-            return None
-
-        candidates = sorted(
-            candidates,
-            key=lambda item: item.get_backdrop_area()
+        self.width = max(
+            100,
+            width
         )
 
-        return candidates[0]
-
-
-    def get_parent_backdrop(self):
-
-        my_rect = self.sceneBoundingRect()
-
-        candidates = []
-
-        for backdrop in self.get_scene_backdrops():
-
-            if backdrop is self:
-                continue
-
-            if backdrop.contains_scene_rect(
-                my_rect
-            ):
-
-                candidates.append(
-                    backdrop
-                )
-
-        if not candidates:
-            return None
-
-        candidates = sorted(
-            candidates,
-            key=lambda item: item.get_backdrop_area()
+        self.height = max(
+            60,
+            height
         )
 
-        return candidates[0]
+        self.on_size_changed()
 
-
-    def get_direct_child_backdrops(self):
-
-        children = []
-
-        for backdrop in self.get_scene_backdrops():
-
-            if backdrop is self:
-                continue
-
-            parent = backdrop.get_parent_backdrop()
-
-            if parent is self:
-
-                children.append(
-                    backdrop
-                )
-
-        return children
-
-
-    def get_direct_node_names(self):
-
-        direct_nodes = []
-
-        scene_map = NEx.get_scene_node_map()
-
-        for node_name, item in scene_map.items():
-
-            try:
-
-                node_rect = item.sceneBoundingRect()
-
-            except RuntimeError:
-                continue
-
-            except Exception:
-                continue
-
-            owner = self.find_smallest_owner_for_rect(
-                node_rect
-            )
-
-            if owner is self:
-
-                direct_nodes.append(
-                    node_name
-                )
-
-        return direct_nodes
-
-
-    def update_direct_contents(self):
-
-        self.contained_nodes = (
-            self.get_direct_node_names()
-        )
-
-        self.child_backdrops = (
-            self.get_direct_child_backdrops()
-        )
-
-    # -----------------------------------------------------
-    # Drag-tree helpers
-    # -----------------------------------------------------
-    def is_descendant_of(
-        self,
-        possible_parent
-    ):
-
-        parent = self.get_parent_backdrop()
-
-        while parent:
-
-            if parent is possible_parent:
-                return True
-
-            parent = parent.get_parent_backdrop()
-
-        return False
-
-
-    def filter_top_level_backdrops(
-        self,
-        backdrops
-    ):
-
-        roots = []
-
-        for backdrop in backdrops:
-
-            has_selected_parent = False
-
-            for other in backdrops:
-
-                if other is backdrop:
-                    continue
-
-                if backdrop.is_descendant_of(
-                    other
-                ):
-
-                    has_selected_parent = True
-                    break
-
-            if not has_selected_parent:
-
-                roots.append(
-                    backdrop
-                )
-
-        return roots
-
-
-    def cache_subtree_for_drag(
-        self,
-        backdrop
-    ):
-
-        if backdrop in self._drag_tree:
-            return
-
-        backdrop.update_direct_contents()
-
-        children = list(
-            getattr(
-                backdrop,
-                "child_backdrops",
-                []
-            )
-        )
-
-        self._drag_tree[backdrop] = {
-            "start_pos": backdrop.pos(),
-            "nodes": list(
-                getattr(
-                    backdrop,
-                    "contained_nodes",
-                    []
-                )
-            ),
-            "children": children
-        }
-
-        for child in children:
-
-            self.cache_subtree_for_drag(
-                child
-            )
-
-
-    def cache_multi_drag_positions(self):
-
-        selected_backdrops = (
-            self.get_selected_backdrops()
-        )
-
-        if self not in selected_backdrops:
-
-            selected_backdrops.append(
-                self
-            )
-
-        self._drag_roots = (
-            self.filter_top_level_backdrops(
-                selected_backdrops
-            )
-        )
-
-        self._drag_tree = {}
-
-        for root in self._drag_roots:
-
-            self.cache_subtree_for_drag(
-                root
-            )
-
-        self._last_drag_delta = None
-
-
-    def apply_subtree_drag_delta(
-        self,
-        backdrop,
-        total_delta,
-        incremental_delta
-    ):
-
-        data = self._drag_tree.get(
-            backdrop
-        )
-
-        if not data:
-            return
-
-        start_pos = data["start_pos"]
-
-        backdrop.setPos(
-            start_pos + total_delta
-        )
-
-        NEx.move_nodes(
-            data["nodes"],
-            incremental_delta.x(),
-            incremental_delta.y()
-        )
-
-        for child in data["children"]:
-
-            self.apply_subtree_drag_delta(
-                child,
-                total_delta,
-                incremental_delta
-            )
-
-    # -----------------------------------------------------
-    # State
-    # -----------------------------------------------------
-
-    def clear_drag_state(self):
-
-        self._dragging = False
-        self._drag_start_mouse = None
-        self._drag_start_pos = None
-        self._x_pressed = False
-        self._multi_drag_start_positions = {}
-
-        self._drag_roots = []
-        self._drag_tree = {}
-        self._last_drag_delta = None
-
-
-    # -----------------------------------------------------
-    # Rects
-    # -----------------------------------------------------
+        self.update()
 
     def get_title_rect(self):
 
@@ -595,7 +242,7 @@ class BackdropItem(QGraphicsItem):
             self.header_height
         )
 
-    def is_in_drag_area(
+    def can_drag_from_pos(
         self,
         pos
     ):
@@ -609,112 +256,50 @@ class BackdropItem(QGraphicsItem):
             pos
         )
 
-    def is_inside_backdrop(
+    # -----------------------------------------------------
+    # Maya node ownership
+    # -----------------------------------------------------
+
+    def find_smallest_owner_for_rect(
         self,
-        pos
+        scene_rect
     ):
 
-        return self.boundingRect().contains(
-            pos
-        )
+        candidates = []
 
-    def get_resize_edge(
-        self,
-        pos
-    ):
-
-        right = (
-            abs(
-                pos.x() - self.width
-            )
-            <= self.resize_margin
-        )
-
-        bottom = (
-            abs(
-                pos.y() - self.height
-            )
-            <= self.resize_margin
-        )
-
-        if right and bottom:
-            return "bottom_right"
-
-        if right:
-            return "right"
-
-        if bottom:
-            return "bottom"
-
-        return None
-
-    # -----------------------------------------------------
-    # Grabbing new-commers Helpers
-    # -----------------------------------------------------
-    def auto_expand_drag_tree(self):
-
-        if not self._drag_tree:
-
-            self.auto_expand_to_capture_nearby_nodes()
-            return
-
-        backdrops = list(
-            self._drag_tree.keys()
-        )
-
-        backdrops = sorted(
-            backdrops,
-            key=lambda item: item.get_backdrop_area()
-        )
-
-        for backdrop in backdrops:
+        for item in self.get_scene_container_items():
 
             try:
 
-                backdrop.auto_expand_to_capture_nearby_nodes()
+                if item.sceneBoundingRect().contains(
+                    scene_rect
+                ):
+
+                    candidates.append(
+                        item
+                    )
 
             except RuntimeError:
-                pass
+                continue
 
             except Exception:
-                pass
-    def node_is_admissible(
-        self,
-        node_rect
-    ):
+                continue
 
-        my_rect = self.sceneBoundingRect()
+        if not candidates:
+            return None
 
-        if my_rect.contains(
-            node_rect
-        ):
-            return False
-
-        intersection = my_rect.intersected(
-            node_rect
+        candidates = sorted(
+            candidates,
+            key=lambda item: item.get_area()
         )
 
-        if intersection.isEmpty():
-            return False
+        return candidates[0]
 
-        return (
-            intersection.width() >= self.node_admission_margin
-            or
-            intersection.height() >= self.node_admission_margin
-        )
+    def get_direct_node_names(self):
 
-
-    def auto_expand_to_capture_nearby_nodes(self):
+        direct_nodes = []
 
         scene_map = NEx.get_scene_node_map()
-
-        my_rect = self.sceneBoundingRect()
-
-        target_rect = QRectF(
-            my_rect
-        )
-
-        changed = False
 
         for node_name, item in scene_map.items():
 
@@ -728,91 +313,24 @@ class BackdropItem(QGraphicsItem):
             except Exception:
                 continue
 
-            # If another smaller backdrop already owns this node,
-            # do not let this bigger backdrop steal it.
             owner = self.find_smallest_owner_for_rect(
                 node_rect
             )
 
-            if owner is not None and owner is not self:
-                continue
+            if owner is self:
 
-            if not self.node_is_admissible(
-                node_rect
-            ):
-                continue
+                direct_nodes.append(
+                    node_name
+                )
 
-            padded_node_rect = node_rect.adjusted(
-                -self.node_capture_padding,
-                -self.node_capture_padding,
-                self.node_capture_padding,
-                self.node_capture_padding
-            )
+        return direct_nodes
 
-            target_rect = target_rect.united(
-                padded_node_rect
-            )
-
-            changed = True
-
-        if not changed:
-            return False
-
-        self.prepareGeometryChange()
-
-        self.setPos(
-            target_rect.left(),
-            target_rect.top()
-        )
-
-        self.width = max(
-            100,
-            target_rect.width()
-        )
-
-        self.height = max(
-            60,
-            target_rect.height()
-        )
+    def update_contained_nodes(self):
 
         self.update_direct_contents()
-        self.update()
-
-        return True
 
     # -----------------------------------------------------
-    # Selection helpers
-    # -----------------------------------------------------
-
-    def is_backdrop_item(
-        self,
-        item
-    ):
-
-        return (
-            getattr(
-                item,
-                "nex_item_type",
-                None
-            )
-            == "backdrop"
-        )
-
-    def get_selected_backdrops(self):
-
-        scene = self.scene()
-
-        if not scene:
-            return []
-
-        return [
-            item
-            for item in scene.selectedItems()
-            if self.is_backdrop_item(item)
-        ]
-
-    # -----------------------------------------------------
-    # Color helpers
+    # Colors
     # -----------------------------------------------------
 
     def clone_color(
@@ -930,30 +448,13 @@ class BackdropItem(QGraphicsItem):
             130
         )
 
-    def pick_backdrop_color(self):
-
-        picked_color = QColorDialog.getColor(
-            self.background_color,
-            None,
-            "Backdrop Color"
-        )
-
-        if not picked_color.isValid():
-            return
-
-        background_alpha = (
-            self.background_color.alpha()
-        )
+    def on_color_changed(
+        self,
+        picked_color
+    ):
 
         header_alpha = (
             self.header_color.alpha()
-        )
-
-        self.background_color = QColor(
-            picked_color.red(),
-            picked_color.green(),
-            picked_color.blue(),
-            background_alpha
         )
 
         header_color = QColor(
@@ -967,8 +468,6 @@ class BackdropItem(QGraphicsItem):
         )
 
         self.header_color = header_color
-
-        self.update()
 
     # -----------------------------------------------------
     # Title editing
@@ -1030,6 +529,233 @@ class BackdropItem(QGraphicsItem):
 
         self.update()
 
+
+    # -----------------------------------------------------
+    # Auto grow on resize-release
+    # -----------------------------------------------------
+
+    def item_is_ancestor_of_self(
+        self,
+        item
+    ):
+
+        parent = self.get_parent_container_for_item(
+            self
+        )
+
+        while parent:
+
+            if parent is item:
+                return True
+
+            parent = self.get_parent_container_for_item(
+                parent
+            )
+
+        return False
+
+    def rect_is_admissible(
+        self,
+        candidate_rect
+    ):
+
+        my_rect = self.sceneBoundingRect()
+
+        if my_rect.contains(
+            candidate_rect
+        ):
+            return False
+
+        intersection = my_rect.intersected(
+            candidate_rect
+        )
+
+        if intersection.isEmpty():
+            return False
+
+        candidate_area = (
+            candidate_rect.width()
+            * candidate_rect.height()
+        )
+
+        if candidate_area <= 0:
+            return False
+
+        intersection_area = (
+            intersection.width()
+            * intersection.height()
+        )
+
+        ratio = (
+            intersection_area
+            / candidate_area
+        )
+
+        return ratio >= self.capture_ratio
+    def can_capture_nex_item(
+        self,
+        item
+    ):
+
+        if item is self:
+            return False
+
+        # Never let an inner/child container wrap one of its ancestors.
+        if self.item_is_ancestor_of_self(
+            item
+        ):
+            return False
+
+        # Never let a smaller container wrap a larger/equal container.
+        # This blocks:
+        #     PARENT wrapping GRANDPARENT
+        # even if PARENT was resized partly outside GRANDPARENT.
+        if self.is_container_nex_item(
+            item
+        ):
+
+            try:
+
+                if item.get_area() >= self.get_area():
+                    return False
+
+            except RuntimeError:
+                return False
+
+            except Exception:
+                return False
+
+        current_parent = self.get_parent_container_for_item(
+            item
+        )
+
+        # If the item already has a parent, only that same parent
+        # is allowed to grow around it.
+        if (
+            current_parent is not None
+            and current_parent is not self
+        ):
+            return False
+
+        return True
+    def expand_to_include_scene_rect(
+        self,
+        scene_rect
+    ):
+
+        my_rect = self.sceneBoundingRect()
+
+        padded_rect = scene_rect.adjusted(
+            -self.node_capture_padding,
+            -self.node_capture_padding,
+            self.node_capture_padding,
+            self.node_capture_padding
+        )
+
+        target_rect = my_rect.united(
+            padded_rect
+        )
+
+        if target_rect == my_rect:
+            return False
+
+        self.prepareGeometryChange()
+
+        self.setPos(
+            target_rect.left(),
+            target_rect.top()
+        )
+
+        self.width = max(
+            100,
+            target_rect.width()
+        )
+
+        self.height = max(
+            60,
+            target_rect.height()
+        )
+
+        self.update_contained_nodes()
+        self.update()
+
+        return True
+    
+    def auto_expand_to_capture_nearby_items(self):
+
+        changed = False
+
+        # -----------------------------------------------------
+        # Maya native nodes
+        # -----------------------------------------------------
+
+        scene_map = NEx.get_scene_node_map()
+
+        for node_name, item in scene_map.items():
+
+            try:
+
+                node_rect = item.sceneBoundingRect()
+
+            except RuntimeError:
+                continue
+
+            except Exception:
+                continue
+
+            owner = self.find_smallest_owner_for_rect(
+                node_rect
+            )
+
+            if owner is not None and owner is not self:
+                continue
+
+            if not self.rect_is_admissible(
+                node_rect
+            ):
+                continue
+
+            if self.expand_to_include_scene_rect(
+                node_rect
+            ):
+
+                changed = True
+
+        # -----------------------------------------------------
+        # NEx parentable items: comments, backdrops, images later
+        # -----------------------------------------------------
+
+        for item in self.get_scene_parentable_items():
+
+            if not self.can_capture_nex_item(
+                item
+            ):
+                continue
+
+            try:
+
+                item_rect = item.sceneBoundingRect()
+
+            except RuntimeError:
+                continue
+
+            except Exception:
+                continue
+
+            if not self.rect_is_admissible(
+                item_rect
+            ):
+                continue
+
+            if self.expand_to_include_scene_rect(
+                item_rect
+            ):
+
+                changed = True
+        if changed:
+
+            self.update_z_hierarchy()
+        return changed
     # -----------------------------------------------------
     # Deletion
     # -----------------------------------------------------
@@ -1039,6 +765,7 @@ class BackdropItem(QGraphicsItem):
         scene = self.scene()
 
         if scene:
+
             scene.removeItem(
                 self
             )
@@ -1076,122 +803,64 @@ class BackdropItem(QGraphicsItem):
         event
     ):
 
-        self._pressed = True
-        self.update()
-
         self._x_pressed = (
             self.get_close_rect().contains(
                 event.pos()
             )
         )
 
-        edge = self.get_resize_edge(
-            event.pos()
-        )
+        if self._x_pressed:
 
-        inside_header = self.is_in_drag_area(
-            event.pos()
-        )
+            self._pressed = True
+            self.update()
 
-        inside_backdrop = self.is_inside_backdrop(
-            event.pos()
-        )
+            event.accept()
+            return
 
         super().mousePressEvent(
             event
         )
-
-        if edge:
-
-            self._resizing = True
-            self._resize_edge = edge
-
-            self._resize_start_mouse = (
-                event.scenePos()
-            )
-
-            self._start_width = self.width
-            self._start_height = self.height
-
-            event.accept()
-            return
-
-        if self._x_pressed:
-
-            event.accept()
-            return
-
-        if inside_header:
-
-            self.update_contained_nodes()
-
-            self._drag_start_mouse = (
-                event.scenePos()
-            )
-
-            self._drag_start_pos = (
-                self.pos()
-            )
-
-            self._dragging = False
-
-            self.cache_multi_drag_positions()
-
-            event.accept()
-            return
-
-        if inside_backdrop:
-
-            event.accept()
-            return
 
     def mouseReleaseEvent(
         self,
         event
     ):
 
-        self._pressed = False
-        self.update()
-
-        self.setCursor(
-            Qt.ArrowCursor
-        )
-
-        if self._resizing:
-
-            self._resizing = False
-            self._resize_edge = None
-
-            self.auto_expand_to_capture_nearby_nodes()
-
-            event.accept()
-            return
-
         if self._x_pressed:
 
             self._x_pressed = False
+            self._pressed = False
+            self.update()
 
             if self.get_close_rect().contains(
                 event.pos()
             ):
+
                 self.delete_self()
 
             event.accept()
             return
 
-        self.auto_expand_drag_tree()
-        self.clear_drag_state()
+        was_resizing = self._resizing
 
         super().mouseReleaseEvent(
             event
         )
+        self.update_z_hierarchy()
+
+        if was_resizing:
+
+            self.auto_expand_to_capture_nearby_items()
+
+            event.accept()
+            return
 
     def mouseDoubleClickEvent(
         self,
         event
     ):
 
-        self.clear_drag_state()
+        self.clear_interaction_state()
 
         self._pressed = False
         self.update()
@@ -1205,216 +874,9 @@ class BackdropItem(QGraphicsItem):
             event.accept()
             return
 
-        self.pick_backdrop_color()
+        self.pick_color()
 
         event.accept()
-
-    def mouseMoveEvent(
-        self,
-        event
-    ):
-
-        # -----------------------------------------------------
-        # Resize
-        # -----------------------------------------------------
-
-        if self._resizing:
-
-            delta = (
-                event.scenePos()
-                - self._resize_start_mouse
-            )
-
-            self.setCursor(
-                Qt.ClosedHandCursor
-            )
-
-            self.prepareGeometryChange()
-
-            if self._resize_edge == "right":
-
-                self.width = max(
-                    100,
-                    self._start_width
-                    + delta.x()
-                )
-
-            elif self._resize_edge == "bottom":
-
-                self.height = max(
-                    60,
-                    self._start_height
-                    + delta.y()
-                )
-
-            elif self._resize_edge == "bottom_right":
-
-                self.width = max(
-                    100,
-                    self._start_width
-                    + delta.x()
-                )
-
-                self.height = max(
-                    60,
-                    self._start_height
-                    + delta.y()
-                )
-
-            self.update()
-
-            event.accept()
-            return
-
-        # -----------------------------------------------------
-        # Drag
-        # -----------------------------------------------------
-
-        if self._drag_start_mouse is None:
-            return
-
-        if not self._dragging:
-
-            move_distance = (
-                event.scenePos()
-                - self._drag_start_mouse
-            ).manhattanLength()
-
-            if move_distance < 4:
-                return
-
-            self._dragging = True
-
-        delta = (
-            event.scenePos()
-            - self._drag_start_mouse
-        )
-
-        if self._last_drag_delta is None:
-
-            incremental_delta = delta
-
-        else:
-
-            incremental_delta = (
-                delta
-                - self._last_drag_delta
-            )
-
-        self._last_drag_delta = delta
-
-        for root in self._drag_roots:
-
-            try:
-
-                self.apply_subtree_drag_delta(
-                    root,
-                    delta,
-                    incremental_delta
-                )
-
-            except RuntimeError:
-                pass
-
-            except Exception:
-                pass
-
-        event.accept()
-
-    # -----------------------------------------------------
-    # Hover events
-    # -----------------------------------------------------
-
-    def hoverEnterEvent(
-        self,
-        event
-    ):
-
-        self._hovered = True
-        self.update()
-
-        super().hoverEnterEvent(
-            event
-        )
-
-    def hoverLeaveEvent(
-        self,
-        event
-    ):
-
-        self._hovered = False
-        self._pressed = False
-        self.update()
-
-        self.setCursor(
-            Qt.ArrowCursor
-        )
-
-        super().hoverLeaveEvent(
-            event
-        )
-
-    def hoverMoveEvent(
-        self,
-        event
-    ):
-
-        edge = self.get_resize_edge(
-            event.pos()
-        )
-
-        if edge == "right":
-
-            self.setCursor(
-                Qt.SizeHorCursor
-            )
-
-        elif edge == "bottom":
-
-            self.setCursor(
-                Qt.SizeVerCursor
-            )
-
-        elif edge == "bottom_right":
-
-            self.setCursor(
-                Qt.SizeFDiagCursor
-            )
-
-        elif self.is_in_drag_area(
-            event.pos()
-        ):
-
-            self.setCursor(
-                Qt.OpenHandCursor
-            )
-
-        else:
-
-            self.setCursor(
-                Qt.ArrowCursor
-            )
-
-        super().hoverMoveEvent(
-            event
-        )
-
-    # -----------------------------------------------------
-    # Geometry / Membership
-    # -----------------------------------------------------
-
-    def boundingRect(self):
-
-        return QRectF(
-            0,
-            0,
-            self.width,
-            self.height
-        )
-
-    def update_contained_nodes(self):
-
-        self.update_direct_contents()
 
     # -----------------------------------------------------
     # Paint
@@ -1493,6 +955,15 @@ class BackdropItem(QGraphicsItem):
             font.setPointSize(14)
             font.setBold(True)
             painter.setFont(font)
+
+            painter.setPen(
+                QColor(
+                    255,
+                    255,
+                    255,
+                    230
+                )
+            )
 
             painter.drawText(
                 10,

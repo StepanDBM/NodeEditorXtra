@@ -1,3 +1,4 @@
+#NEx_SDBM.api.py
 import os
 
 from maya import cmds
@@ -61,7 +62,7 @@ def delete_selected_backdrops():
             pass
 
     print(
-        "NEx | Deleted {} backdrop(s)".format(
+        "NEx | Deleted {} item(s)".format(
             deleted_count
         )
     )
@@ -83,12 +84,12 @@ def create_backdrop_from_selection(title="New Group"):
 
     node_bounds = NEx.get_selection_bounds()
 
-    selected_backdrops = (
-        NEx.get_selected_backdrop_items()
+    selected_nex_items = (
+        NEx.get_selected_parentable_nex_items()
     )
 
-    backdrop_bounds = (
-        NEx.get_selected_backdrop_bounds()
+    nex_item_bounds = (
+        NEx.get_selected_parentable_nex_bounds()
     )
 
     padding = 40
@@ -101,15 +102,15 @@ def create_backdrop_from_selection(title="New Group"):
             NEx.get_selected_node_names()
         )
 
-        child_backdrops = []
+        child_nex_items = []
 
-    elif backdrop_bounds:
+    elif nex_item_bounds:
 
-        bounds = backdrop_bounds
+        bounds = nex_item_bounds
 
         contained_nodes = []
 
-        child_backdrops = selected_backdrops
+        child_nex_items = selected_nex_items
 
     else:
 
@@ -131,33 +132,16 @@ def create_backdrop_from_selection(title="New Group"):
     scene.addItem(
         backdrop
     )
-
     backdrop.setPos(
         bounds.left() - padding,
         bounds.top() - padding
     )
 
+    backdrop.update_z_hierarchy()
+
     backdrop.contained_nodes = contained_nodes
 
-    # If this is a parent backdrop, put it visually behind the selected children.
-    if child_backdrops:
-
-        try:
-
-            min_z = min(
-                child.zValue()
-                for child in child_backdrops
-            )
-
-            backdrop.setZValue(
-                min_z - 1
-            )
-
-        except Exception:
-
-            backdrop.setZValue(
-                -1
-            )
+    backdrop.update_z_hierarchy()
 
     _NEX_ITEMS.append(
         backdrop
@@ -166,7 +150,7 @@ def create_backdrop_from_selection(title="New Group"):
     return backdrop
 
 
-def clear_all_backdrops():
+def clear_all_NExItems():
 
     removed = serializer.clear_all_tab_backdrops()
 
@@ -176,7 +160,7 @@ def clear_all_backdrops():
     ]
 
     print(
-        "NEx | Cleared {} backdrop(s)".format(
+        "NEx | Cleared {} item(s)".format(
             len(removed)
         )
     )
@@ -221,6 +205,7 @@ def create_comment(text="Comment"):
             0,
             0
         )
+    comment.update_z_hierarchy()
 
     _NEX_ITEMS.append(
         comment
@@ -287,7 +272,7 @@ def save_all(filepath=None):
         )
 
     print(
-        "NEx | No live backdrops found. Checking scene storage..."
+        "NEx | No live NEx items found. Checking scene storage..."
     )
 
     try:
@@ -342,7 +327,7 @@ def load_all(
         filepath = get_default_nex_path()
 
     if clear_existing:
-        clear_all_backdrops()
+        clear_all_NExItems()
 
     created = serializer.load_nex(
         filepath
@@ -414,7 +399,7 @@ def load_from_scene(
 ):
 
     if clear_existing:
-        clear_all_backdrops()
+        clear_all_NExItems()
 
     data = scene_storage.read_scene_data()
 

@@ -33,23 +33,15 @@ def is_nex_item_like(item):
     )
 def is_backdrop_like(item):
 
-    required_attrs = [
-        "title",
-        "width",
-        "height",
-        "roundness",
-        "background_color",
-        "header_color",
-        "border_color",
-        "pressed_border_color",
-    ]
+    return (
+        getattr(
+            item,
+            "nex_item_type",
+            None
+        )
+        == "backdrop"
+    )
 
-    for attr in required_attrs:
-
-        if not hasattr(item, attr):
-            return False
-
-    return True
 def is_comment_like(item):
 
     return (
@@ -672,7 +664,9 @@ def create_backdrop_from_data(
         width=width,
         height=height
     )
-
+    backdrop.nex_item_type = "backdrop"
+    backdrop.nex_parentable = True
+    backdrop.nex_container = True
     apply_backdrop_data(
         backdrop,
         data
@@ -714,7 +708,9 @@ def create_comment_from_data(
         width=width,
         height=height
     )
-
+    comment.nex_item_type = "comment"
+    comment.nex_parentable = True
+    comment.nex_container = False
     position_data = data.get(
         "position",
         {}
@@ -870,6 +866,31 @@ def load_tabs_from_data(data):
                     scene
                 )
             )
+    updated_scenes = []
+
+    for item in created:
+
+        try:
+
+            scene = item.scene()
+
+            if not scene:
+                continue
+
+            if scene in updated_scenes:
+                continue
+
+            item.update_z_hierarchy()
+
+            updated_scenes.append(
+                scene
+            )
+
+        except RuntimeError:
+            pass
+
+        except Exception:
+            pass
 
     return created
 

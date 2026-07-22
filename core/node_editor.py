@@ -642,6 +642,15 @@ def is_nex_backdrop(item):
         == "backdrop"
     )
 
+def is_nex_parentable_item(item):
+
+    return bool(
+        getattr(
+            item,
+            "nex_parentable",
+            False
+        )
+    )
 
 # ---------------------------------------------------------
 # Node Mapping
@@ -741,6 +750,29 @@ def get_selected_backdrop_items():
         for item in get_selected_items()
         if is_nex_backdrop(item)
     ]
+# ---------------------------------------------------------
+# NEx Abstraction to item methods
+# ---------------------------------------------------------
+
+def get_selected_nex_items():
+
+    return [
+        item
+        for item in get_selected_items()
+        if is_nex_item(item)
+    ]
+def get_selected_parentable_nex_items():
+
+    return [
+        item
+        for item in get_selected_items()
+        if is_nex_parentable_item(item)
+    ]
+def get_selected_parentable_nex_bounds():
+
+    return get_bounds_from_items(
+        get_selected_parentable_nex_items()
+    )
 
 
 def get_bounds_from_items(items):
