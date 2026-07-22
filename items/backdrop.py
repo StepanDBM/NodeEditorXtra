@@ -79,12 +79,12 @@ class BackdropTitleEditor(QGraphicsTextItem):
         event
     ):
 
-        self.backdrop.finish_title_edit(
-            commit=True
-        )
-
         super().focusOutEvent(
             event
+        )
+
+        self.backdrop.finish_title_edit(
+            commit=True
         )
 
     def keyPressEvent(
@@ -116,6 +116,27 @@ class BackdropTitleEditor(QGraphicsTextItem):
         super().keyPressEvent(
             event
         )
+    def mouseDoubleClickEvent(
+        self,
+        event
+    ):
+
+        if event.button() != Qt.LeftButton:
+
+            event.accept()
+            return
+
+        super().mouseDoubleClickEvent(
+            event
+        )
+
+
+    def contextMenuEvent(
+        self,
+        event
+    ):
+
+        event.accept()
 
 
 class BackdropItem(NExGraphicsItem):
@@ -333,38 +354,6 @@ class BackdropItem(NExGraphicsItem):
     # Colors
     # -----------------------------------------------------
 
-    def clone_color(
-        self,
-        color
-    ):
-
-        return QColor(
-            color.red(),
-            color.green(),
-            color.blue(),
-            color.alpha()
-        )
-
-    def get_hover_background_color(self):
-
-        color = self.clone_color(
-            self.background_color
-        )
-
-        return color.lighter(
-            120
-        )
-
-    def get_pressed_background_color(self):
-
-        color = self.clone_color(
-            self.background_color
-        )
-
-        return color.lighter(
-            145
-        )
-
     def get_hover_header_color(self):
 
         color = self.clone_color(
@@ -372,8 +361,9 @@ class BackdropItem(NExGraphicsItem):
         )
 
         return color.lighter(
-            120
+            self.hover_lighter_factor
         )
+
 
     def get_pressed_header_color(self):
 
@@ -385,68 +375,18 @@ class BackdropItem(NExGraphicsItem):
             150
         )
 
-    def get_soft_selection_color(self):
-
-        color = self.clone_color(
-            self.background_color
-        )
-
-        color.setAlpha(
-            210
-        )
-
-        return color.lighter(
-            180
-        )
-
-    def get_pressed_selection_color(self):
-
-        return QColor(
-            90,
-            255,
-            130,
-            240
-        )
-
-    def get_paint_background_color(self):
-
-        if self._pressed:
-            return self.get_pressed_background_color()
-
-        if self._hovered:
-            return self.get_hover_background_color()
-
-        return self.background_color
 
     def get_paint_header_color(self):
 
         if self._pressed:
+
             return self.get_pressed_header_color()
 
         if self._hovered:
+
             return self.get_hover_header_color()
 
         return self.header_color
-
-    def get_paint_border_color(self):
-
-        if self._pressed:
-            return self.get_pressed_selection_color()
-
-        if self.isSelected():
-            return self.get_soft_selection_color()
-
-        color = self.clone_color(
-            self.background_color
-        )
-
-        color.setAlpha(
-            150
-        )
-
-        return color.lighter(
-            130
-        )
 
     def on_color_changed(
         self,
@@ -860,6 +800,11 @@ class BackdropItem(NExGraphicsItem):
         event
     ):
 
+        if event.button() != Qt.LeftButton:
+
+            event.accept()
+            return
+
         self.clear_interaction_state()
 
         self._pressed = False
@@ -905,13 +850,9 @@ class BackdropItem(NExGraphicsItem):
             self.get_paint_border_color()
         )
 
-        border_width = 2
-
-        if self._pressed:
-            border_width = 3
-
-        elif self.isSelected():
-            border_width = 3
+        border_width = (
+            self.get_paint_border_width()
+        )
 
         painter.setBrush(
             QBrush(

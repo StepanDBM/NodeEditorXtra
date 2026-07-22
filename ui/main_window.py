@@ -328,7 +328,7 @@ class NExMainWindow(QWidget):
 
         try:
 
-            api.clear_all_backdrops()
+            api.clear_all_NExItems()
 
         except Exception as error:
 

@@ -74,15 +74,17 @@ class CommentTextEditor(QGraphicsTextItem):
             999
         )
 
+        text_rect = comment.get_text_rect()
+
         self.setPos(
-            10,
-            8
+            text_rect.left(),
+            text_rect.top()
         )
 
         self.setTextWidth(
             max(
                 60,
-                comment.width - 20
+                text_rect.width()
             )
         )
         self.document().setDefaultTextOption(
@@ -94,12 +96,12 @@ class CommentTextEditor(QGraphicsTextItem):
         event
     ):
 
-        self.comment.finish_text_edit(
-            commit=True
-        )
-
         super().focusOutEvent(
             event
+        )
+
+        self.comment.finish_text_edit(
+            commit=True
         )
 
     def keyPressEvent(
@@ -119,6 +121,27 @@ class CommentTextEditor(QGraphicsTextItem):
         super().keyPressEvent(
             event
         )
+    def mouseDoubleClickEvent(
+        self,
+        event
+    ):
+
+        if event.button() != Qt.LeftButton:
+
+            event.accept()
+            return
+
+        super().mouseDoubleClickEvent(
+            event
+        )
+
+
+    def contextMenuEvent(
+        self,
+        event
+    ):
+
+        event.accept()
 
 
 class CommentItem(NExGraphicsItem):
@@ -183,47 +206,24 @@ class CommentItem(NExGraphicsItem):
     # Color helpers
     # -----------------------------------------------------
 
-    def clone_color(
-        self,
-        color
-    ):
 
-        return QColor(
-            color.red(),
-            color.green(),
-            color.blue(),
-            color.alpha()
+    def get_color_rect(self):
+        return QRectF(
+            self.width - 30,
+            7,
+            20,
+            20
         )
 
-    def get_paint_background_color(self):
 
-        color = self.clone_color(
-            self.background_color
+    def get_text_rect(self):
+
+        return QRectF(
+            10,
+            34,
+            self.width - 20,
+            self.height - 42
         )
-
-        if self._pressed:
-
-            return color.lighter(
-                145
-            )
-
-        if self._hovered:
-
-            return color.lighter(
-                120
-            )
-
-        return color
-
-    def get_paint_border_color(self):
-
-        if self._pressed:
-            return self.selected_border_color
-
-        if self.isSelected():
-            return self.selected_border_color
-
-        return self.border_color
 
     # -----------------------------------------------------
     # Text editing
@@ -301,6 +301,7 @@ class CommentItem(NExGraphicsItem):
 
         return option
 
+
     # -----------------------------------------------------
     # Mouse events
     # -----------------------------------------------------
@@ -310,18 +311,26 @@ class CommentItem(NExGraphicsItem):
         event
     ):
 
+        if event.button() != Qt.LeftButton:
+
+            event.accept()
+            return
+
         self.clear_interaction_state()
 
         self._pressed = False
         self.update()
 
-        if event.modifiers() & Qt.ControlModifier:
+        if self.get_color_rect().contains(
+            event.pos()
+        ):
 
             self.pick_color()
 
-        else:
+            event.accept()
+            return
 
-            self.start_text_edit()
+        self.start_text_edit()
 
         event.accept()
 
@@ -387,11 +396,7 @@ class CommentItem(NExGraphicsItem):
             QPainter.Antialiasing
         )
 
-        border_width = 2
-
-        if self._pressed or self.isSelected():
-
-            border_width = 3
+        border_width = self.get_paint_border_width()
 
         painter.setBrush(
             QBrush(
@@ -411,19 +416,40 @@ class CommentItem(NExGraphicsItem):
             self.roundness,
             self.roundness
         )
+        color_rect = self.get_color_rect()
 
+        painter.setBrush(
+            QBrush(
+                self.background_color.lighter(
+                    130
+                )
+            )
+        )
+
+        painter.setPen(
+            QPen(
+                QColor(
+                    255,
+                    255,
+                    255,
+                    180
+                ),
+                1
+            )
+        )
+
+        painter.drawRoundedRect(
+            color_rect,
+            4,
+            4
+        )
         if self.text_editor is None:
 
             font = painter.font()
             font.setPointSize(11)
             painter.setFont(font)
 
-            text_rect = QRectF(
-                10,
-                8,
-                self.width - 20,
-                self.height - 16
-            )
+            text_rect = self.get_text_rect()
 
             painter.setPen(
                 QColor(

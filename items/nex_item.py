@@ -72,6 +72,17 @@ class NExGraphicsItem(QGraphicsItem):
             240
         )
 
+        self.normal_border_alpha = 180
+        self.normal_border_darker_factor = 1000
+
+        self.hover_lighter_factor = 120
+        self.pressed_lighter_factor = 145
+
+        self.normal_border_width = 2
+        self.selected_border_width = 3
+        self.pressed_border_width = 3
+
+
         self._hovered = False
         self._pressed = False
 
@@ -582,29 +593,6 @@ class NExGraphicsItem(QGraphicsItem):
 
         return children
 
-    def get_direct_child_nex_items(self):
-
-        children = []
-
-        for item in self.get_scene_parentable_items():
-
-            if item is self:
-                continue
-
-            try:
-                parent = item.get_parent_container()
-
-            except Exception:
-                parent = None
-
-            if parent is self:
-
-                children.append(
-                    item
-                )
-
-        return children
-
     def filter_top_level_items(
         self,
         items
@@ -882,6 +870,104 @@ class NExGraphicsItem(QGraphicsItem):
     # Color
     # -----------------------------------------------------
 
+    def clone_color(
+        self,
+        color
+    ):
+
+        return QColor(
+            color.red(),
+            color.green(),
+            color.blue(),
+            color.alpha()
+        )
+
+
+    def get_hover_background_color(self):
+
+        color = self.clone_color(
+            self.background_color
+        )
+
+        return color.lighter(
+            self.hover_lighter_factor
+        )
+
+
+    def get_pressed_background_color(self):
+
+        color = self.clone_color(
+            self.background_color
+        )
+
+        return color.lighter(
+            self.pressed_lighter_factor
+        )
+
+
+    def get_normal_border_color(self):
+
+        color = self.clone_color(
+            self.background_color
+        )
+
+        color.setAlpha(
+            self.normal_border_alpha
+        )
+
+        return color.darker(
+            self.normal_border_darker_factor
+        )
+
+
+    def get_selected_border_color(self):
+
+        return self.selected_border_color
+
+
+    def get_pressed_border_color(self):
+
+        return self.selected_border_color
+
+
+    def get_paint_background_color(self):
+
+        if self._pressed:
+
+            return self.get_pressed_background_color()
+
+        if self._hovered:
+
+            return self.get_hover_background_color()
+
+        return self.background_color
+
+
+    def get_paint_border_color(self):
+
+        if self._pressed:
+
+            return self.get_pressed_border_color()
+
+        if self.isSelected():
+
+            return self.get_selected_border_color()
+
+        return self.get_normal_border_color()
+
+
+    def get_paint_border_width(self):
+
+        if self._pressed:
+
+            return self.pressed_border_width
+
+        if self.isSelected():
+
+            return self.selected_border_width
+
+        return self.normal_border_width
+
     def pick_color(self):
 
         picked_color = QColorDialog.getColor(
@@ -1092,6 +1178,11 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         event
     ):
+
+        if event.button() != Qt.LeftButton:
+
+            event.accept()
+            return
 
         self._pressed = False
         self.update()
