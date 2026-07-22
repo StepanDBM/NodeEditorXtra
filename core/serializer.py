@@ -271,13 +271,38 @@ def build_data():
 # Save
 # ---------------------------------------------------------
 
-def save_nex(filepath):
+def data_has_backdrops(data):
+
+    tabs = data.get(
+        "tabs",
+        {}
+    )
+
+    for tab_data in tabs.values():
+
+        if tab_data.get(
+            "backdrops",
+            []
+        ):
+            return True
+
+    if data.get(
+        "backdrops",
+        []
+    ):
+        return True
+
+    return False
+
+
+def save_data(
+    filepath,
+    data
+):
 
     filepath = normalize_filepath(
         filepath
     )
-
-    data = build_data()
 
     folder = os.path.dirname(
         filepath
@@ -304,12 +329,20 @@ def save_nex(filepath):
         )
 
     print(
-        "NEx | Saved:",
+        "NEx | Exported:",
         filepath
     )
 
     return filepath
 
+def save_nex(filepath):
+
+    data = build_data()
+
+    return save_data(
+        filepath,
+        data
+    )
 
 # ---------------------------------------------------------
 # Read
@@ -575,9 +608,7 @@ def load_nex(filepath):
 
     return created
 
-# ---------------------------------------------------------
-# SceneLoader
-# ---------------------------------------------------------
+
 
 def load_data(data):
 

@@ -204,8 +204,65 @@ def save_all(filepath=None):
     if filepath is None:
         filepath = get_default_nex_path()
 
-    return serializer.save_nex(
-        filepath
+    live_data = serializer.build_data()
+
+    if serializer.data_has_backdrops(
+        live_data
+    ):
+
+        print(
+            "NEx | Exporting live Node Editor data."
+        )
+
+        return serializer.save_data(
+            filepath,
+            live_data
+        )
+
+    print(
+        "NEx | No live backdrops found. Checking scene storage..."
+    )
+
+    try:
+
+        scene_data = scene_storage.read_scene_data()
+
+    except Exception as error:
+
+        print(
+            "NEx | No usable scene storage found:",
+            error
+        )
+
+        print(
+            "NEx | Exporting empty live data."
+        )
+
+        return serializer.save_data(
+            filepath,
+            live_data
+        )
+
+    if serializer.data_has_backdrops(
+        scene_data
+    ):
+
+        print(
+            "NEx | Exporting NEx_SceneData storage."
+        )
+
+        return serializer.save_data(
+            filepath,
+            scene_data
+        )
+
+    print(
+        "NEx | Scene storage exists but contains no backdrops. Exporting empty data."
+    )
+
+    return serializer.save_data(
+        filepath,
+        live_data
     )
 
 
