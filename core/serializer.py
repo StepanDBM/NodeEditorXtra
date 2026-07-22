@@ -13,15 +13,24 @@ except ImportError:
 
 import NEx_SDBM.core.node_editor as NEx
 from NEx_SDBM.items.backdrop import BackdropItem
+from NEx_SDBM.items.comment import CommentItem
 
 
 NEX_VERSION = 2
 
 
 # ---------------------------------------------------------
-# Helpers
+# Type Detection Actions
 # ---------------------------------------------------------
+def is_nex_item_like(item):
 
+    return bool(
+        getattr(
+            item,
+            "nex_item_type",
+            None
+        )
+    )
 def is_backdrop_like(item):
 
     required_attrs = [
@@ -41,6 +50,18 @@ def is_backdrop_like(item):
             return False
 
     return True
+def is_comment_like(item):
+
+    return (
+        getattr(
+            item,
+            "nex_item_type",
+            None
+        )
+        == "comment"
+    )
+
+
 
 
 def is_live_item(item):
@@ -112,9 +133,34 @@ def color_from_data(data, fallback=None):
         return QColor(fallback)
 
 
+
+
+
+
 # ---------------------------------------------------------
 # Backdrop Collection
 # ---------------------------------------------------------
+def get_scene_items(scene=None):
+
+    if scene is None:
+        scene = NEx.get_scene()
+
+    items = []
+
+    for item in scene.items():
+
+        if not is_nex_item_like(item):
+            continue
+
+        if not is_live_item(item):
+            continue
+
+        items.append(
+            item
+        )
+
+    return items
+
 
 def get_scene_backdrops(scene=None):
 
@@ -137,6 +183,26 @@ def get_scene_backdrops(scene=None):
 
     return backdrops
 
+def get_scene_comments(scene=None):
+
+    if scene is None:
+        scene = NEx.get_scene()
+
+    comments = []
+
+    for item in scene.items():
+
+        if not is_comment_like(item):
+            continue
+
+        if not is_live_item(item):
+            continue
+
+        comments.append(
+            item
+        )
+
+    return comments
 
 def get_all_tab_backdrops():
 
@@ -160,6 +226,11 @@ def get_all_tab_backdrops():
             )
 
     return result
+
+
+
+
+
 
 
 # ---------------------------------------------------------
@@ -235,12 +306,57 @@ def serialize_backdrop(
         )
     }
 
+def serialize_comment(
+    comment,
+    tab_info
+):
+
+    return {
+        "type": "CommentItem",
+
+        "tab": {
+            "index": tab_info["index"],
+            "name": tab_info["name"],
+            "key": tab_info["key"]
+        },
+
+        "text": comment.text,
+
+        "position": {
+            "x": comment.pos().x(),
+            "y": comment.pos().y()
+        },
+
+        "size": {
+            "width": comment.width,
+            "height": comment.height
+        },
+
+        "style": {
+            "roundness": comment.roundness,
+            "background_color": color_to_data(
+                comment.background_color
+            ),
+            "border_color": color_to_data(
+                comment.border_color
+            ),
+            "selected_border_color": color_to_data(
+                comment.selected_border_color
+            )
+        }
+    }
+
+
 
 def build_data():
 
     tabs = {}
 
-    for backdrop, tab_info in get_all_tab_backdrops():
+    for tab_index, scene in NEx.iter_tab_scenes():
+
+        tab_info = NEx.get_tab_info(
+            tab_index
+        )
 
         tab_name = tab_info["name"]
 
@@ -250,15 +366,31 @@ def build_data():
                 "index": tab_info["index"],
                 "name": tab_info["name"],
                 "key": tab_info["key"],
-                "backdrops": []
+                "backdrops": [],
+                "comments": []
             }
 
-        tabs[tab_name]["backdrops"].append(
-            serialize_backdrop(
-                backdrop,
-                tab_info
+        for backdrop in get_scene_backdrops(
+            scene
+        ):
+
+            tabs[tab_name]["backdrops"].append(
+                serialize_backdrop(
+                    backdrop,
+                    tab_info
+                )
             )
-        )
+
+        for comment in get_scene_comments(
+            scene
+        ):
+
+            tabs[tab_name]["comments"].append(
+                serialize_comment(
+                    comment,
+                    tab_info
+                )
+            )
 
     return {
         "format": "NEx",
@@ -270,6 +402,53 @@ def build_data():
 # ---------------------------------------------------------
 # Save
 # ---------------------------------------------------------
+def data_has_nex_items(data):
+
+    tabs = data.get(
+        "tabs",
+        {}
+    )
+
+    for tab_data in tabs.values():
+
+        if tab_data.get(
+            "backdrops",
+            []
+        ):
+            return True
+
+        if tab_data.get(
+            "comments",
+            []
+        ):
+            return True
+
+        if tab_data.get(
+            "items",
+            []
+        ):
+            return True
+
+    if data.get(
+        "backdrops",
+        []
+    ):
+        return True
+
+    if data.get(
+        "comments",
+        []
+    ):
+        return True
+
+    if data.get(
+        "items",
+        []
+    ):
+        return True
+
+    return False
+
 
 def data_has_backdrops(data):
 
@@ -505,6 +684,94 @@ def create_backdrop_from_data(
 
     return backdrop
 
+def create_comment_from_data(
+    data,
+    scene
+):
+
+    text = data.get(
+        "text",
+        "Comment"
+    )
+
+    size_data = data.get(
+        "size",
+        {}
+    )
+
+    width = size_data.get(
+        "width",
+        240
+    )
+
+    height = size_data.get(
+        "height",
+        120
+    )
+
+    comment = CommentItem(
+        text=text,
+        width=width,
+        height=height
+    )
+
+    position_data = data.get(
+        "position",
+        {}
+    )
+
+    comment.setPos(
+        position_data.get(
+            "x",
+            0
+        ),
+        position_data.get(
+            "y",
+            0
+        )
+    )
+
+    style_data = data.get(
+        "style",
+        {}
+    )
+
+    comment.roundness = style_data.get(
+        "roundness",
+        comment.roundness
+    )
+
+    comment.background_color = color_from_data(
+        style_data.get(
+            "background_color"
+        ),
+        comment.background_color
+    )
+
+    comment.border_color = color_from_data(
+        style_data.get(
+            "border_color"
+        ),
+        comment.border_color
+    )
+
+    comment.selected_border_color = color_from_data(
+        style_data.get(
+            "selected_border_color"
+        ),
+        comment.selected_border_color
+    )
+
+    scene.addItem(
+        comment
+    )
+
+    comment.update()
+
+    return comment
+
+
+
 
 def load_tabs_from_data(data):
 
@@ -587,6 +854,22 @@ def load_tabs_from_data(data):
                     scene
                 )
             )
+        for comment_data in tab_data.get(
+            "comments",
+            []
+        ):
+
+            if comment_data.get(
+                "type"
+            ) != "CommentItem":
+                continue
+
+            created.append(
+                create_comment_from_data(
+                    comment_data,
+                    scene
+                )
+            )
 
     return created
 
@@ -622,42 +905,48 @@ def load_data(data):
 # Clear
 # ---------------------------------------------------------
 
-def clear_backdrops(backdrops):
+def clear_items(items):
 
     removed = []
 
-    for backdrop in list(backdrops):
+    for item in list(items):
 
-        if not is_backdrop_like(backdrop):
+        if not is_nex_item_like(item):
             continue
 
         try:
 
-            scene = backdrop.scene()
+            scene = item.scene()
 
             if scene:
                 scene.removeItem(
-                    backdrop
+                    item
                 )
 
             removed.append(
-                backdrop
+                item
             )
 
         except RuntimeError:
 
             removed.append(
-                backdrop
+                item
             )
 
         except Exception as error:
 
             print(
-                "NEx | Failed to clear backdrop:",
+                "NEx | Failed to clear item:",
                 error
             )
 
     return removed
+
+def clear_backdrops(backdrops):
+
+    return clear_items(
+        backdrops
+    )
 
 
 def clear_all_tab_backdrops():
@@ -666,13 +955,13 @@ def clear_all_tab_backdrops():
 
     for tab_index, scene in NEx.iter_tab_scenes():
 
-        backdrops = get_scene_backdrops(
+        items = get_scene_items(
             scene
         )
 
         removed.extend(
-            clear_backdrops(
-                backdrops
+            clear_items(
+                items
             )
         )
 

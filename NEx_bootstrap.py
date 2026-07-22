@@ -1,4 +1,4 @@
-# NEx_bootstrap.py
+# NEx_SDBM/NEx_bootstrap.py
 
 import importlib
 
@@ -19,15 +19,23 @@ MODULES = [
     "NEx_SDBM.ui.minimap",
     "NEx_SDBM.ui.search",
 
-    "NEx_SDBM.api",
+    "NEx_SDBM.api"
 ]
 
 
-def reload_all():
+def reload_all(
+    exclude=None
+):
+
+    if exclude is None:
+        exclude = []
 
     reloaded_modules = []
 
     for module_name in MODULES:
+
+        if module_name in exclude:
+            continue
 
         module = __import__(
             module_name,

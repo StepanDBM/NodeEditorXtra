@@ -7,18 +7,28 @@ import NEx_SDBM.core.serializer as serializer
 
 from NEx_SDBM.items.backdrop import BackdropItem
 import NEx_SDBM.core.scene_storage as scene_storage
-from NEx_SDBM.core.utilities import undoChunk as unDo
+from NEx_SDBM.items.comment import CommentItem
+#from NEx_SDBM.core.utilities import undoChunk as unDo
 
 _NEX_ITEMS = []
 
 # api.py selection-related replacements
 
+# ---------------------------------------------------------
+# General NEx
+# ---------------------------------------------------------
 def clear_nex_selection():
 
     scene = NEx.get_scene()
 
     scene.clearSelection()
 
+
+
+
+# ---------------------------------------------------------
+# BackDropSpecific Actions
+# ---------------------------------------------------------
 
 def delete_selected_backdrops():
 
@@ -30,7 +40,7 @@ def delete_selected_backdrops():
 
     for item in list(selected):
 
-        if not serializer.is_backdrop_like(item):
+        if not serializer.is_nex_item_like(item):
             continue
 
         try:
@@ -171,6 +181,64 @@ def clear_all_backdrops():
         )
     )
 
+
+
+
+
+
+# ---------------------------------------------------------
+# CommentSpecific Actions
+# ---------------------------------------------------------
+
+def create_comment(text="Comment"):
+
+    scene = NEx.get_scene()
+
+    comment = CommentItem(
+        text=text
+    )
+
+    scene.addItem(
+        comment
+    )
+
+    try:
+
+        view = scene.views()[0]
+
+        center = view.mapToScene(
+            view.viewport().rect()
+        ).boundingRect().center()
+
+        comment.setPos(
+            center.x() - 120,
+            center.y() - 60
+        )
+
+    except Exception:
+
+        comment.setPos(
+            0,
+            0
+        )
+
+    _NEX_ITEMS.append(
+        comment
+    )
+
+    return comment
+
+
+
+
+
+
+
+
+# ---------------------------------------------------------
+# Save/LoadSpecific Actions
+# ---------------------------------------------------------
+
 def get_default_nex_path():
     scene_path = cmds.file(
         query=True,
@@ -198,7 +266,6 @@ def get_default_nex_path():
         "untitled.nex"
     )
 
-
 def save_all(filepath=None):
 
     if filepath is None:
@@ -206,7 +273,7 @@ def save_all(filepath=None):
 
     live_data = serializer.build_data()
 
-    if serializer.data_has_backdrops(
+    if serializer.data_has_nex_items(
         live_data
     ):
 
@@ -243,7 +310,7 @@ def save_all(filepath=None):
             live_data
         )
 
-    if serializer.data_has_backdrops(
+    if serializer.data_has_nex_items(
         scene_data
     ):
 
@@ -257,7 +324,7 @@ def save_all(filepath=None):
         )
 
     print(
-        "NEx | Scene storage exists but contains no backdrops. Exporting empty data."
+        "NEx | Scene storage exists but contains no NEx items. Exporting empty data."
     )
 
     return serializer.save_data(
@@ -322,8 +389,14 @@ def load_all_dialog():
         clear_existing=True
     )
 
+
+
+
+
+
+
 # ---------------------------------------------------------
-# SceneLoader
+# SceneSave/Loadspecific Actions
 # ---------------------------------------------------------
 def save_to_scene():
 
@@ -354,7 +427,7 @@ def load_from_scene(
     )
 
     print(
-        "NEx | Loaded {} backdrop(s) from scene data.".format(
+        "NEx | Loaded {} item(s) from scene data.".format(
             len(created)
         )
     )
@@ -372,16 +445,18 @@ def has_scene_storage():
     return scene_storage.has_scene_data()
 
 
+
+
+
+# ---------------------------------------------------------
+# MainUISpecific Actions
+# ---------------------------------------------------------
 _NEX_WINDOW = None
-
-
 def show_ui():
 
     global _NEX_WINDOW
 
-    from NEx_SDBM.ui.main_window import (
-        NExMainWindow
-    )
+    from NEx_SDBM.ui.main_window import NExMainWindow
 
     try:
 

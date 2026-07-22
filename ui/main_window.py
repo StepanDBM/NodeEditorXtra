@@ -100,29 +100,38 @@ class NExMainWindow(QWidget):
         # -------------------------------------------------
         # Main actions
         # -------------------------------------------------
+        actions_layout = QHBoxLayout()
 
         self.create_backdrop_btn = QPushButton(
-            "Create Backdrop"
+            "Create"
+        )
+        self.create_comment_btn = QPushButton(
+            "Comment"
         )
 
         self.delete_selected_btn = QPushButton(
-            "Delete Selected"
+            "Delete"
         )
 
         self.clear_all_btn = QPushButton(
             "Clear All"
         )
 
-        main_layout.addWidget(
+        actions_layout.addWidget(
             self.create_backdrop_btn
         )
-
-        main_layout.addWidget(
+        actions_layout.addWidget(
+            self.create_comment_btn
+        )
+        actions_layout.addWidget(
             self.delete_selected_btn
         )
 
-        main_layout.addWidget(
+        actions_layout.addWidget(
             self.clear_all_btn
+        )
+        main_layout.addLayout(
+            actions_layout
         )
 
         # -------------------------------------------------
@@ -216,7 +225,9 @@ class NExMainWindow(QWidget):
         self.create_backdrop_btn.clicked.connect(
             self.create_backdrop_from_selection
         )
-
+        self.create_comment_btn.clicked.connect(
+            self.create_comment
+        )
         self.delete_selected_btn.clicked.connect(
             self.delete_selected_backdrops
         )
@@ -282,6 +293,21 @@ class NExMainWindow(QWidget):
 
             print(
                 "NEx | Could not create backdrop:",
+                error
+            )
+
+    def create_comment(self):
+
+        try:
+
+            api.create_comment(
+                "Comment"
+            )
+
+        except Exception as error:
+
+            print(
+                "NEx | Could not create comment:",
                 error
             )
 
