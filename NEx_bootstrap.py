@@ -1,59 +1,87 @@
 # NEx_SDBM/NEx_bootstrap.py
 
-import importlib
+import sys
+from importlib import reload
 
 
-MODULES = [
+MODULES_TO_RELOAD = [
+
+    # Core
     "NEx_SDBM.core.node_editor",
-    "NEx_SDBM.core.serializer",
     "NEx_SDBM.core.scene_storage",
-
     "NEx_SDBM.core.utilities.undoChunk",
 
+    # Items base first
     "NEx_SDBM.items.nex_item",
+
+    # Items
     "NEx_SDBM.items.backdrop",
     "NEx_SDBM.items.comment",
     "NEx_SDBM.items.image",
 
+    # Serializer after items
+    "NEx_SDBM.core.serializer",
+
+    # UI
     "NEx_SDBM.ui.backdrop_editor",
-    "NEx_SDBM.ui.main_window",
     "NEx_SDBM.ui.minimap",
     "NEx_SDBM.ui.search",
+    "NEx_SDBM.ui.main_window",
 
-    "NEx_SDBM.api"
+    # API
+    "NEx_SDBM.api",
+
+    # Entry
+    "NEx_SDBM.launcher",
 ]
 
 
-def reload_all(
-    exclude=None
-):
+def reload_all():
 
-    if exclude is None:
-        exclude = []
+    reloaded = []
 
-    reloaded_modules = []
+    for module_name in MODULES_TO_RELOAD:
 
-    for module_name in MODULES:
+        if module_name in sys.modules:
 
-        if module_name in exclude:
-            continue
+            try:
 
-        module = __import__(
-            module_name,
-            fromlist=["dummy"]
+                reload(
+                    sys.modules[module_name]
+                )
+
+                reloaded.append(
+                    module_name
+                )
+
+            except Exception as error:
+
+                print(
+                    "NEx | Could not reload {}: {}".format(
+                        module_name,
+                        error
+                    )
+                )
+
+    print(
+        "NEx | Reloaded modules:"
+    )
+
+    for module_name in reloaded:
+
+        print(
+            " - {}".format(
+                module_name
+            )
         )
 
-        importlib.reload(
-            module
-        )
+    return reloaded
 
-        reloaded_modules.append(
-            module_name
-        )
 
-    print("NEx | Reloaded modules:")
+def run():
 
-    for module_name in reloaded_modules:
-        print(" -", module_name)
+    reload_all()
 
-    return reloaded_modules
+    import NEx_SDBM.launcher as launcher
+
+    launcher.show()

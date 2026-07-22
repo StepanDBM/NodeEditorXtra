@@ -4,6 +4,7 @@ from maya import OpenMayaUI
 from maya import cmds
 
 import NEx_SDBM.api as api
+import NEx_SDBM.NEx_bootstrap as bootstrap
 
 
 try:
@@ -77,7 +78,8 @@ class NExMainWindow(QWidget):
         )
 
         self.setWindowFlags(
-            Qt.Tool
+            Qt.Window
+            | Qt.WindowStaysOnTopHint
         )
 
         self.build_ui()
@@ -102,37 +104,19 @@ class NExMainWindow(QWidget):
         # -------------------------------------------------
         actions_layout = QHBoxLayout()
 
-        self.create_backdrop_btn = QPushButton(
-            "Create"
-        )
-        self.create_comment_btn = QPushButton(
-            "Comment"
-        )
+        self.create_backdrop_btn = QPushButton("Create")
+        self.create_comment_btn = QPushButton("Comment")
+        self.create_image_btn = QPushButton("Image")
+        self.delete_selected_btn = QPushButton("Delete")
+        self.clear_all_btn = QPushButton("Clear All")
 
-        self.delete_selected_btn = QPushButton(
-            "Delete"
-        )
+        actions_layout.addWidget(self.create_backdrop_btn)
+        actions_layout.addWidget(self.create_comment_btn)
+        actions_layout.addWidget(self.create_image_btn)
+        actions_layout.addWidget(self.delete_selected_btn)
+        actions_layout.addWidget(self.clear_all_btn)
 
-        self.clear_all_btn = QPushButton(
-            "Clear All"
-        )
-
-        actions_layout.addWidget(
-            self.create_backdrop_btn
-        )
-        actions_layout.addWidget(
-            self.create_comment_btn
-        )
-        actions_layout.addWidget(
-            self.delete_selected_btn
-        )
-
-        actions_layout.addWidget(
-            self.clear_all_btn
-        )
-        main_layout.addLayout(
-            actions_layout
-        )
+        main_layout.addLayout(actions_layout)
 
         # -------------------------------------------------
         # Scene persistence
@@ -223,15 +207,17 @@ class NExMainWindow(QWidget):
     def create_connections(self):
 
         self.create_backdrop_btn.clicked.connect(
-            self.create_backdrop_from_selection
+            self._create_backdrop_from_selection_deferred
         )
         self.create_comment_btn.clicked.connect(
             self.create_comment
         )
+        self.create_image_btn.clicked.connect(
+            self.create_image
+        )
         self.delete_selected_btn.clicked.connect(
             self.delete_selected_backdrops
         )
-
         self.clear_all_btn.clicked.connect(
             self.clear_all_backdrops
         )
@@ -308,7 +294,19 @@ class NExMainWindow(QWidget):
                 "NEx | Could not create comment:",
                 error
             )
+    def create_image(self):
 
+        try:
+
+            api.create_image()
+
+        except Exception as error:
+
+            print(
+                "NEx | Could not create image:",
+                error
+            )
+            
     def delete_selected_backdrops(self):
 
         try:
@@ -391,9 +389,7 @@ class NExMainWindow(QWidget):
 
     def reload_modules(self):
 
-        import NEx_SDBM.NEx_bootstrap as bootstrap
-
-        bootstrap.reload_all()
+        bootstrap.run()
 
         print(
             "NEx | Dev reload complete."
@@ -402,3 +398,27 @@ class NExMainWindow(QWidget):
     def clear_nex_selection(self):
 
         api.clear_nex_selection()
+
+    def closeEvent(
+        self,
+        event
+    ):
+
+        try:
+
+            import __main__
+
+            if getattr(
+                __main__,
+                "NEX_WINDOW",
+                None
+            ) is self:
+
+                __main__.NEX_WINDOW = None
+
+        except Exception:
+            pass
+
+        super().closeEvent(
+            event
+        )

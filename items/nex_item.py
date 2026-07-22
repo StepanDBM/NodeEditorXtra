@@ -689,6 +689,17 @@ class NExGraphicsItem(QGraphicsItem):
             self.update_z_for_item(
                 item
             )
+    """
+    # -----------------------------------------------------
+    # FocusView Abstraction
+    # -----------------------------------------------------
+
+    def center_view_on_self(self):
+
+        return NEx.center_view_on_item(
+            self
+        )
+    """
     # -----------------------------------------------------
     # Hierarchy
     # -----------------------------------------------------

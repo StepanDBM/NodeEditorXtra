@@ -6,9 +6,10 @@ from maya import cmds
 import NEx_SDBM.core.node_editor as NEx
 import NEx_SDBM.core.serializer as serializer
 
-from NEx_SDBM.items.backdrop import BackdropItem
 import NEx_SDBM.core.scene_storage as scene_storage
+from NEx_SDBM.items.backdrop import BackdropItem
 from NEx_SDBM.items.comment import CommentItem
+from NEx_SDBM.items.image import ImageItem
 #from NEx_SDBM.core.utilities import undoChunk as unDo
 
 _NEX_ITEMS = []
@@ -435,31 +436,73 @@ def has_scene_storage():
 
 
 
+# ---------------------------------------------------------
+# ImageSpecific Actions
+# ---------------------------------------------------------
 
+def create_image(
+    image_path=None,
+    title="Image"
+):
+
+    if image_path is None:
+
+        result = cmds.fileDialog2(
+            fileMode=1,
+            caption="Choose Image",
+            fileFilter="Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff *.webp)"
+        )
+
+        if not result:
+            return None
+
+        image_path = result[0]
+
+    scene = NEx.get_scene()
+
+    image = ImageItem(
+        title=title,
+        image_path=image_path
+    )
+
+    scene.addItem(
+        image
+    )
+
+    try:
+
+        view = scene.views()[0]
+
+        center = view.mapToScene(
+            view.viewport().rect()
+        ).boundingRect().center()
+
+        image.setPos(
+            center.x() - 160,
+            center.y() - 110
+        )
+
+    except Exception:
+
+        image.setPos(
+            0,
+            0
+        )
+
+    image.update_z_hierarchy()
+
+    _NEX_ITEMS.append(
+        image
+    )
+
+    return image
 
 # ---------------------------------------------------------
 # MainUISpecific Actions
 # ---------------------------------------------------------
-_NEX_WINDOW = None
+
 def show_ui():
 
-    global _NEX_WINDOW
+    import NEx_SDBM.launcher as launcher
 
-    from NEx_SDBM.ui.main_window import NExMainWindow
-
-    try:
-
-        if _NEX_WINDOW is not None:
-            _NEX_WINDOW.close()
-            _NEX_WINDOW.deleteLater()
-
-    except Exception:
-        pass
-
-    _NEX_WINDOW = NExMainWindow()
-
-    _NEX_WINDOW.show()
-    _NEX_WINDOW.raise_()
-    _NEX_WINDOW.activateWindow()
-
-    return _NEX_WINDOW
+    return launcher.show()

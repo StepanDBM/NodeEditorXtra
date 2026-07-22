@@ -14,6 +14,7 @@ except ImportError:
 import NEx_SDBM.core.node_editor as NEx
 from NEx_SDBM.items.backdrop import BackdropItem
 from NEx_SDBM.items.comment import CommentItem
+from NEx_SDBM.items.image import ImageItem
 
 
 NEX_VERSION = 2
@@ -41,7 +42,6 @@ def is_backdrop_like(item):
         )
         == "backdrop"
     )
-
 def is_comment_like(item):
 
     return (
@@ -51,6 +51,16 @@ def is_comment_like(item):
             None
         )
         == "comment"
+    )
+def is_image_like(item):
+
+    return (
+        getattr(
+            item,
+            "nex_item_type",
+            None
+        )
+        == "image"
     )
 
 
@@ -130,7 +140,7 @@ def color_from_data(data, fallback=None):
 
 
 # ---------------------------------------------------------
-# Backdrop Collection
+# Items Collection
 # ---------------------------------------------------------
 def get_scene_items(scene=None):
 
@@ -219,6 +229,26 @@ def get_all_tab_backdrops():
 
     return result
 
+def get_scene_images(scene=None):
+
+    if scene is None:
+        scene = NEx.get_scene()
+
+    images = []
+
+    for item in scene.items():
+
+        if not is_image_like(item):
+            continue
+
+        if not is_live_item(item):
+            continue
+
+        images.append(
+            item
+        )
+
+    return images
 
 
 
@@ -339,7 +369,54 @@ def serialize_comment(
         }
     }
 
+def serialize_image(
+    image,
+    tab_info
+):
 
+    return {
+        "type": "ImageItem",
+
+        "tab": {
+            "index": tab_info["index"],
+            "name": tab_info["name"],
+            "key": tab_info["key"]
+        },
+
+        "title": image.title,
+
+        "image_path": image.image_path,
+
+        "position": {
+            "x": image.pos().x(),
+            "y": image.pos().y()
+        },
+
+        "size": {
+            "width": image.width,
+            "height": image.height
+        },
+
+        "style": {
+            "roundness": image.roundness,
+
+            "background_color": color_to_data(
+                image.background_color
+            ),
+
+            "header_color": color_to_data(
+                image.header_color
+            ),
+
+            "border_color": color_to_data(
+                image.border_color
+            ),
+
+            "selected_border_color": color_to_data(
+                image.selected_border_color
+            )
+        }
+    }
 
 def build_data():
 
@@ -360,7 +437,8 @@ def build_data():
                 "name": tab_info["name"],
                 "key": tab_info["key"],
                 "backdrops": [],
-                "comments": []
+                "comments": [],
+                "images": []
             }
 
         for backdrop in get_scene_backdrops(
@@ -381,6 +459,16 @@ def build_data():
             tabs[tab_name]["comments"].append(
                 serialize_comment(
                     comment,
+                    tab_info
+                )
+            )
+        for image in get_scene_images(
+            scene
+        ):
+
+            tabs[tab_name]["images"].append(
+                serialize_image(
+                    image,
                     tab_info
                 )
             )
@@ -430,6 +518,12 @@ def data_has_nex_items(data):
 
     if data.get(
         "comments",
+        []
+    ):
+        return True
+    
+    if tab_data.get(
+        "images",
         []
     ):
         return True
@@ -773,6 +867,110 @@ def create_comment_from_data(
     return comment
 
 
+def create_image_from_data(
+    data,
+    scene
+):
+
+    title = data.get(
+        "title",
+        "Image"
+    )
+
+    image_path = data.get(
+        "image_path",
+        ""
+    )
+
+    size_data = data.get(
+        "size",
+        {}
+    )
+
+    width = size_data.get(
+        "width",
+        320
+    )
+
+    height = size_data.get(
+        "height",
+        220
+    )
+
+    image = ImageItem(
+        title=title,
+        image_path=image_path,
+        width=width,
+        height=height
+    )
+
+    image.nex_item_type = "image"
+    image.nex_parentable = True
+    image.nex_container = False
+
+    position_data = data.get(
+        "position",
+        {}
+    )
+
+    image.setPos(
+        position_data.get(
+            "x",
+            0
+        ),
+        position_data.get(
+            "y",
+            0
+        )
+    )
+
+    style_data = data.get(
+        "style",
+        {}
+    )
+
+    image.roundness = style_data.get(
+        "roundness",
+        image.roundness
+    )
+
+    image.background_color = color_from_data(
+        style_data.get(
+            "background_color"
+        ),
+        image.background_color
+    )
+
+    image.header_color = color_from_data(
+        style_data.get(
+            "header_color"
+        ),
+        image.header_color
+    )
+
+    image.border_color = color_from_data(
+        style_data.get(
+            "border_color"
+        ),
+        image.border_color
+    )
+
+    image.selected_border_color = color_from_data(
+        style_data.get(
+            "selected_border_color"
+        ),
+        image.selected_border_color
+    )
+
+    image.load_pixmap()
+
+    scene.addItem(
+        image
+    )
+
+    image.update()
+
+    return image
 
 
 def load_tabs_from_data(data):
@@ -872,6 +1070,23 @@ def load_tabs_from_data(data):
                     scene
                 )
             )
+        for image_data in tab_data.get(
+            "images",
+            []
+        ):
+
+            if image_data.get(
+                "type"
+            ) != "ImageItem":
+                continue
+
+            created.append(
+                create_image_from_data(
+                    image_data,
+                    scene
+                )
+            )
+
     updated_scenes = []
 
     for item in created:
