@@ -174,11 +174,15 @@ def clear_all_NExItems():
 # CommentSpecific Actions
 # ---------------------------------------------------------
 
-def create_comment(text="Comment"):
+def create_comment(
+    title="Comment",
+    text="Comment"
+):
 
     scene = NEx.get_scene()
 
     comment = CommentItem(
+        title=title,
         text=text
     )
 

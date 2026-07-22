@@ -3,11 +3,15 @@
 try:
     from PySide2.QtWidgets import (
         QGraphicsItem,
+        QGraphicsTextItem,
         QColorDialog
     )
 
     from PySide2.QtGui import (
-        QColor
+        QColor,
+        QBrush,
+        QPen,
+        QPainter
     )
 
     from PySide2.QtCore import (
@@ -18,11 +22,15 @@ try:
 except ImportError:
     from PySide6.QtWidgets import (
         QGraphicsItem,
+        QGraphicsTextItem,
         QColorDialog
     )
 
     from PySide6.QtGui import (
-        QColor
+        QColor,
+        QBrush,
+        QPen,
+        QPainter
     )
 
     from PySide6.QtCore import (
@@ -33,11 +41,121 @@ except ImportError:
 
 import NEx_SDBM.core.node_editor as NEx
 
+class NExTitleEditor(QGraphicsTextItem):
+
+    def __init__(
+        self,
+        item
+    ):
+        super().__init__(
+            item
+        )
+
+        self.nex_item = item
+
+        self.setPlainText(
+            item.title
+        )
+
+        self.setTextInteractionFlags(
+            Qt.TextEditorInteraction
+        )
+
+        self.setDefaultTextColor(
+            QColor(
+                255,
+                255,
+                255
+            )
+        )
+
+        self.setZValue(
+            999
+        )
+
+        title_rect = item.get_title_rect()
+
+        self.setPos(
+            title_rect.left(),
+            title_rect.top() + 3
+        )
+
+        self.setTextWidth(
+            max(
+                40,
+                title_rect.width()
+            )
+        )
+
+    def focusOutEvent(
+        self,
+        event
+    ):
+
+        super().focusOutEvent(
+            event
+        )
+
+        self.nex_item.finish_title_edit(
+            commit=True
+        )
+
+    def keyPressEvent(
+        self,
+        event
+    ):
+
+        if event.key() in (
+            Qt.Key_Return,
+            Qt.Key_Enter
+        ):
+
+            self.nex_item.finish_title_edit(
+                commit=True
+            )
+
+            event.accept()
+            return
+
+        if event.key() == Qt.Key_Escape:
+
+            self.nex_item.finish_title_edit(
+                commit=False
+            )
+
+            event.accept()
+            return
+
+        super().keyPressEvent(
+            event
+        )
+
+    def mouseDoubleClickEvent(
+        self,
+        event
+    ):
+
+        if event.button() != Qt.LeftButton:
+
+            event.accept()
+            return
+
+        super().mouseDoubleClickEvent(
+            event
+        )
+
+    def contextMenuEvent(
+        self,
+        event
+    ):
+
+        event.accept()
 
 class NExGraphicsItem(QGraphicsItem):
 
     def __init__(
         self,
+        title="NEx Item",
         width=240,
         height=120
     ):
@@ -50,6 +168,13 @@ class NExGraphicsItem(QGraphicsItem):
         self.width = width
         self.height = height
         self.roundness = 6
+
+        self.header_color = QColor(
+            35,
+            35,
+            35,
+            230
+        )
 
         self.background_color = QColor(
             45,
@@ -82,9 +207,14 @@ class NExGraphicsItem(QGraphicsItem):
         self.selected_border_width = 3
         self.pressed_border_width = 3
 
+        self.title = title
+        self.title_editor = None
+
+        self.header_height = 28
 
         self._hovered = False
         self._pressed = False
+        self._x_pressed = False
 
         self._dragging = False
         self._drag_start_mouse = None
@@ -174,6 +304,103 @@ class NExGraphicsItem(QGraphicsItem):
 
         pass
 
+
+    def get_header_rect(self):
+
+        return QRectF(
+            0,
+            0,
+            self.width,
+            self.header_height
+        )
+
+
+    def get_title_rect(self):
+
+        return QRectF(
+            10,
+            0,
+            self.width - 42,
+            self.header_height
+        )
+    def get_close_rect(self):
+
+        size = 18
+        margin = 6
+
+        return QRectF(
+            self.width - size - margin,
+            (
+                self.header_height
+                - size
+            )
+            * 0.5,
+            size,
+            size
+        )
+
+
+    def delete_self(self):
+
+        scene = self.scene()
+
+        if scene:
+
+            scene.removeItem(
+                self
+            )
+
+
+    def paint_close_button(
+        self,
+        painter
+    ):
+
+        close_rect = self.get_close_rect()
+
+        painter.setBrush(
+            QBrush(
+                QColor(
+                    255,
+                    255,
+                    255,
+                    210
+                )
+            )
+        )
+
+        painter.setPen(
+            QPen(
+                QColor(
+                    40,
+                    40,
+                    40,
+                    180
+                ),
+                1
+            )
+        )
+
+        painter.drawRoundedRect(
+            close_rect,
+            6,
+            6
+        )
+
+        painter.drawText(
+            close_rect,
+            Qt.AlignCenter,
+            "X"
+        )
+
+    def get_body_rect(self):
+
+        return QRectF(
+            0,
+            self.header_height,
+            self.width,
+            self.height - self.header_height
+        )
     # -----------------------------------------------------
     # Generic type checks
     # -----------------------------------------------------
@@ -870,6 +1097,40 @@ class NExGraphicsItem(QGraphicsItem):
     # Color
     # -----------------------------------------------------
 
+    def get_hover_header_color(self):
+
+        color = self.clone_color(
+            self.header_color
+        )
+
+        return color.lighter(
+            self.hover_lighter_factor
+        )
+
+
+    def get_pressed_header_color(self):
+
+        color = self.clone_color(
+            self.header_color
+        )
+
+        return color.lighter(
+            self.pressed_lighter_factor
+        )
+
+
+    def get_paint_header_color(self):
+
+        if self._pressed:
+
+            return self.get_pressed_header_color()
+
+        if self._hovered:
+
+            return self.get_hover_header_color()
+
+        return self.header_color
+
     def clone_color(
         self,
         color
@@ -1000,6 +1261,80 @@ class NExGraphicsItem(QGraphicsItem):
     ):
 
         pass
+    def on_body_double_click(
+        self,
+        event
+    ):
+
+        self.pick_color()
+    # -----------------------------------------------------
+    # Header Abstaction
+    # -----------------------------------------------------
+
+    def start_title_edit(self):
+
+        if self.title_editor:
+            return
+
+        self.title_editor = NExTitleEditor(
+            self
+        )
+
+        self.title_editor.setFocus()
+
+        self.update()
+
+
+    def finish_title_edit(
+        self,
+        commit=True
+    ):
+
+        if not self.title_editor:
+            return
+
+        editor = self.title_editor
+        self.title_editor = None
+
+        if commit:
+
+            new_title = (
+                editor
+                .toPlainText()
+                .strip()
+            )
+
+            if new_title:
+                self.title = new_title
+                self.on_title_changed()
+
+        scene = self.scene()
+
+        try:
+
+            editor.setParentItem(
+                None
+            )
+
+            if scene:
+
+                scene.removeItem(
+                    editor
+                )
+
+        except RuntimeError:
+            pass
+
+        except Exception:
+            pass
+
+        self.update()
+
+
+    def on_title_changed(self):
+
+        pass
+
 
     # -----------------------------------------------------
     # Mouse events
@@ -1009,6 +1344,20 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         event
     ):
+
+        self._x_pressed = (
+            self.get_close_rect().contains(
+                event.pos()
+            )
+        )
+
+        if self._x_pressed:
+
+            self._pressed = True
+            self.update()
+
+            event.accept()
+            return
 
         self._pressed = True
         self.update()
@@ -1049,11 +1398,25 @@ class NExGraphicsItem(QGraphicsItem):
 
             event.accept()
             return
-
     def mouseReleaseEvent(
         self,
         event
     ):
+
+        if self._x_pressed:
+
+            self._x_pressed = False
+            self._pressed = False
+            self.update()
+
+            if self.get_close_rect().contains(
+                event.pos()
+            ):
+
+                self.delete_self()
+
+            event.accept()
+            return
 
         self._pressed = False
         self.update()
@@ -1073,6 +1436,7 @@ class NExGraphicsItem(QGraphicsItem):
 
         self.clear_interaction_state()
         self.update_z_hierarchy()
+
         super().mouseReleaseEvent(
             event
         )
@@ -1184,13 +1548,32 @@ class NExGraphicsItem(QGraphicsItem):
             event.accept()
             return
 
+        self.clear_interaction_state()
+
         self._pressed = False
         self.update()
 
-        self.pick_color()
+        if self.get_close_rect().contains(
+            event.pos()
+        ):
+
+            event.accept()
+            return
+
+        if self.get_title_rect().contains(
+            event.pos()
+        ):
+
+            self.start_title_edit()
+
+            event.accept()
+            return
+
+        self.on_body_double_click(
+            event
+        )
 
         event.accept()
-
     # -----------------------------------------------------
     # Hover
     # -----------------------------------------------------
@@ -1245,36 +1628,45 @@ class NExGraphicsItem(QGraphicsItem):
         event
     ):
 
-        edge = self.get_resize_edge(
-            event.pos()
-        )
-
-        if edge == "right":
-
-            cursor_state = "resize_right"
-            cursor = Qt.SizeHorCursor
-
-        elif edge == "bottom":
-
-            cursor_state = "resize_bottom"
-            cursor = Qt.SizeVerCursor
-
-        elif edge == "bottom_right":
-
-            cursor_state = "resize_bottom_right"
-            cursor = Qt.SizeFDiagCursor
-
-        elif self.can_drag_from_pos(
+        if self.get_close_rect().contains(
             event.pos()
         ):
 
-            cursor_state = "drag"
-            cursor = Qt.OpenHandCursor
+            cursor_state = "close"
+            cursor = Qt.ArrowCursor
 
         else:
 
-            cursor_state = "default"
-            cursor = Qt.ArrowCursor
+            edge = self.get_resize_edge(
+                event.pos()
+            )
+
+            if edge == "right":
+
+                cursor_state = "resize_right"
+                cursor = Qt.SizeHorCursor
+
+            elif edge == "bottom":
+
+                cursor_state = "resize_bottom"
+                cursor = Qt.SizeVerCursor
+
+            elif edge == "bottom_right":
+
+                cursor_state = "resize_bottom_right"
+                cursor = Qt.SizeFDiagCursor
+
+            elif self.can_drag_from_pos(
+                event.pos()
+            ):
+
+                cursor_state = "drag"
+                cursor = Qt.OpenHandCursor
+
+            else:
+
+                cursor_state = "default"
+                cursor = Qt.ArrowCursor
 
         if cursor_state != self._hover_cursor_state:
 
@@ -1286,4 +1678,102 @@ class NExGraphicsItem(QGraphicsItem):
 
         super().hoverMoveEvent(
             event
+        )
+        
+    # -----------------------------------------------------
+    # Paint Abstraction
+    # -----------------------------------------------------
+    def paint_base_panel(
+        self,
+        painter
+    ):
+
+        painter.setRenderHint(
+            QPainter.Antialiasing
+        )
+
+        background_color = (
+            self.get_paint_background_color()
+        )
+
+        header_color = (
+            self.get_paint_header_color()
+        )
+
+        border_color = (
+            self.get_paint_border_color()
+        )
+
+        border_width = (
+            self.get_paint_border_width()
+        )
+
+        painter.setBrush(
+            QBrush(
+                background_color
+            )
+        )
+
+        painter.setPen(
+            QPen(
+                border_color,
+                border_width
+            )
+        )
+
+        painter.drawRoundedRect(
+            self.boundingRect(),
+            self.roundness,
+            self.roundness
+        )
+
+        painter.setBrush(
+            QBrush(
+                header_color
+            )
+        )
+
+        painter.drawRoundedRect(
+            self.get_header_rect(),
+            self.roundness,
+            self.roundness
+        )
+
+        self.paint_title(
+            painter
+        )
+
+        self.paint_close_button(
+            painter
+        )
+
+
+    def paint_title(
+        self,
+        painter
+    ):
+
+        if self.title_editor is not None:
+            return
+
+        font = painter.font()
+        font.setPointSize(11)
+        font.setBold(True)
+        painter.setFont(
+            font
+        )
+
+        painter.setPen(
+            QColor(
+                255,
+                255,
+                255,
+                230
+            )
+        )
+
+        painter.drawText(
+            self.get_title_rect(),
+            Qt.AlignVCenter,
+            self.title
         )

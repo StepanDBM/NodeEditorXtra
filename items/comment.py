@@ -135,7 +135,12 @@ class CommentTextEditor(QGraphicsTextItem):
             event
         )
 
+    def on_body_double_click(
+        self,
+        event
+    ):
 
+        self.start_text_edit()
     def contextMenuEvent(
         self,
         event
@@ -148,11 +153,13 @@ class CommentItem(NExGraphicsItem):
 
     def __init__(
         self,
+        title="Comment",
         text="Comment",
         width=240,
         height=120
     ):
         super().__init__(
+            title=title,
             width=width,
             height=height
         )
@@ -198,7 +205,7 @@ class CommentItem(NExGraphicsItem):
             self.text_editor.setTextWidth(
                 max(
                     60,
-                    self.width - 20
+                    self.get_text_rect().width()
                 )
             )
 
@@ -207,22 +214,15 @@ class CommentItem(NExGraphicsItem):
     # -----------------------------------------------------
 
 
-    def get_color_rect(self):
-        return QRectF(
-            self.width - 30,
-            7,
-            20,
-            20
-        )
-
-
     def get_text_rect(self):
 
+        body_rect = self.get_body_rect()
+
         return QRectF(
-            10,
-            34,
-            self.width - 20,
-            self.height - 42
+            body_rect.left() + 10,
+            body_rect.top() + 8,
+            body_rect.width() - 20,
+            body_rect.height() - 16
         )
 
     # -----------------------------------------------------
@@ -306,33 +306,12 @@ class CommentItem(NExGraphicsItem):
     # Mouse events
     # -----------------------------------------------------
 
-    def mouseDoubleClickEvent(
+    def on_body_double_click(
         self,
         event
     ):
 
-        if event.button() != Qt.LeftButton:
-
-            event.accept()
-            return
-
-        self.clear_interaction_state()
-
-        self._pressed = False
-        self.update()
-
-        if self.get_color_rect().contains(
-            event.pos()
-        ):
-
-            self.pick_color()
-
-            event.accept()
-            return
-
         self.start_text_edit()
-
-        event.accept()
 
     def contextMenuEvent(
         self,
@@ -392,61 +371,15 @@ class CommentItem(NExGraphicsItem):
         widget
     ):
 
-        painter.setRenderHint(
-            QPainter.Antialiasing
+        self.paint_base_panel(
+            painter
         )
 
-        border_width = self.get_paint_border_width()
-
-        painter.setBrush(
-            QBrush(
-                self.get_paint_background_color()
-            )
-        )
-
-        painter.setPen(
-            QPen(
-                self.get_paint_border_color(),
-                border_width
-            )
-        )
-
-        painter.drawRoundedRect(
-            self.boundingRect(),
-            self.roundness,
-            self.roundness
-        )
-        color_rect = self.get_color_rect()
-
-        painter.setBrush(
-            QBrush(
-                self.background_color.lighter(
-                    130
-                )
-            )
-        )
-
-        painter.setPen(
-            QPen(
-                QColor(
-                    255,
-                    255,
-                    255,
-                    180
-                ),
-                1
-            )
-        )
-
-        painter.drawRoundedRect(
-            color_rect,
-            4,
-            4
-        )
         if self.text_editor is None:
 
             font = painter.font()
             font.setPointSize(11)
+            font.setBold(False)
             painter.setFont(font)
 
             text_rect = self.get_text_rect()

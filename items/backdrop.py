@@ -37,106 +37,7 @@ except ImportError:
 
 import NEx_SDBM.core.node_editor as NEx
 
-from NEx_SDBM.items.nex_item import (
-    NExGraphicsItem
-)
-
-
-class BackdropTitleEditor(QGraphicsTextItem):
-
-    def __init__(
-        self,
-        backdrop
-    ):
-        super().__init__(
-            backdrop
-        )
-
-        self.backdrop = backdrop
-
-        self.setPlainText(backdrop.title)
-
-        self.setTextInteractionFlags(Qt.TextEditorInteraction)
-
-        self.setDefaultTextColor(
-            QColor(
-                255,
-                255,
-                255
-            )
-        )
-
-        self.setZValue(999)
-
-        self.setPos(8,5)
-
-        self.setTextWidth(
-            max(50, backdrop.width - 45)
-        )
-
-    def focusOutEvent(
-        self,
-        event
-    ):
-
-        super().focusOutEvent(
-            event
-        )
-
-        self.backdrop.finish_title_edit(
-            commit=True
-        )
-
-    def keyPressEvent(
-        self,
-        event
-    ):
-
-        if event.key() in (
-            Qt.Key_Return,
-            Qt.Key_Enter
-        ):
-
-            self.backdrop.finish_title_edit(
-                commit=True
-            )
-
-            event.accept()
-            return
-
-        if event.key() == Qt.Key_Escape:
-
-            self.backdrop.finish_title_edit(
-                commit=False
-            )
-
-            event.accept()
-            return
-
-        super().keyPressEvent(
-            event
-        )
-    def mouseDoubleClickEvent(
-        self,
-        event
-    ):
-
-        if event.button() != Qt.LeftButton:
-
-            event.accept()
-            return
-
-        super().mouseDoubleClickEvent(
-            event
-        )
-
-
-    def contextMenuEvent(
-        self,
-        event
-    ):
-
-        event.accept()
+from NEx_SDBM.items.nex_item import NExGraphicsItem
 
 
 class BackdropItem(NExGraphicsItem):
@@ -148,6 +49,7 @@ class BackdropItem(NExGraphicsItem):
         height=180
     ):
         super().__init__(
+            title=title,
             width=width,
             height=height
         )
@@ -156,15 +58,8 @@ class BackdropItem(NExGraphicsItem):
         self.nex_parentable = True
         self.nex_container = True
 
-        self.title = title
-        self.title_editor = None
-
         self.header_height = 35
         self.roundness = 4
-
-        self.close_size = 20
-        self.close_padding = 8
-        self._x_pressed = False
 
         self.contained_nodes = []
         self.child_nex_items = []
@@ -232,27 +127,6 @@ class BackdropItem(NExGraphicsItem):
         self.on_size_changed()
 
         self.update()
-
-    def get_title_rect(self):
-
-        return QRectF(
-            8,
-            0,
-            self.width - 45,
-            self.header_height
-        )
-
-    def get_close_rect(self):
-
-        size = 18
-        margin = 6
-
-        return QRectF(
-            self.width - size - margin,
-            (self.header_height - size) * 0.5,
-            size,
-            size
-        )
 
     def get_header_rect(self):
 
@@ -408,67 +282,6 @@ class BackdropItem(NExGraphicsItem):
         )
 
         self.header_color = header_color
-
-    # -----------------------------------------------------
-    # Title editing
-    # -----------------------------------------------------
-
-    def start_title_edit(self):
-
-        if self.title_editor:
-            return
-
-        self.title_editor = BackdropTitleEditor(
-            self
-        )
-
-        self.title_editor.setFocus()
-
-        self.update()
-
-    def finish_title_edit(
-        self,
-        commit=True
-    ):
-
-        if not self.title_editor:
-            return
-
-        editor = self.title_editor
-        self.title_editor = None
-
-        if commit:
-
-            new_title = (
-                editor
-                .toPlainText()
-                .strip()
-            )
-
-            if new_title:
-                self.title = new_title
-
-        scene = self.scene()
-
-        try:
-
-            editor.setParentItem(
-                None
-            )
-
-            if scene:
-                scene.removeItem(
-                    editor
-                )
-
-        except RuntimeError:
-            pass
-
-        except Exception:
-            pass
-
-        self.update()
-
 
     # -----------------------------------------------------
     # Auto grow on resize-release
@@ -700,16 +513,6 @@ class BackdropItem(NExGraphicsItem):
     # Deletion
     # -----------------------------------------------------
 
-    def delete_self(self):
-
-        scene = self.scene()
-
-        if scene:
-
-            scene.removeItem(
-                self
-            )
-
     def contextMenuEvent(
         self,
         event
@@ -765,22 +568,6 @@ class BackdropItem(NExGraphicsItem):
         self,
         event
     ):
-
-        if self._x_pressed:
-
-            self._x_pressed = False
-            self._pressed = False
-            self.update()
-
-            if self.get_close_rect().contains(
-                event.pos()
-            ):
-
-                self.delete_self()
-
-            event.accept()
-            return
-
         was_resizing = self._resizing
 
         super().mouseReleaseEvent(
@@ -795,33 +582,12 @@ class BackdropItem(NExGraphicsItem):
             event.accept()
             return
 
-    def mouseDoubleClickEvent(
+    def on_body_double_click(
         self,
         event
     ):
 
-        if event.button() != Qt.LeftButton:
-
-            event.accept()
-            return
-
-        self.clear_interaction_state()
-
-        self._pressed = False
-        self.update()
-
-        if self.get_title_rect().contains(
-            event.pos()
-        ):
-
-            self.start_title_edit()
-
-            event.accept()
-            return
-
         self.pick_color()
-
-        event.accept()
 
     # -----------------------------------------------------
     # Paint
@@ -890,63 +656,12 @@ class BackdropItem(NExGraphicsItem):
             self.roundness
         )
 
-        if self.title_editor is None:
-
-            font = painter.font()
-            font.setPointSize(14)
-            font.setBold(True)
-            painter.setFont(font)
-
-            painter.setPen(
-                QColor(
-                    255,
-                    255,
-                    255,
-                    230
-                )
-            )
-
-            painter.drawText(
-                10,
-                25,
-                self.title
-            )
-
-        close_rect = self.get_close_rect()
-
-        painter.setBrush(
-            QBrush(
-                QColor(
-                    255,
-                    255,
-                    255,
-                    210
-                )
-            )
+        self.paint_title(
+            painter
         )
 
-        painter.setPen(
-            QPen(
-                QColor(
-                    40,
-                    40,
-                    40,
-                    180
-                ),
-                1
-            )
-        )
-
-        painter.drawRoundedRect(
-            close_rect,
-            6,
-            6
-        )
-
-        painter.drawText(
-            close_rect,
-            Qt.AlignCenter,
-            "X"
+        self.paint_close_button(
+            painter
         )
 
         painter.setPen(

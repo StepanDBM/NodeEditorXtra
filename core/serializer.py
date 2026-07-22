@@ -311,6 +311,7 @@ def serialize_comment(
             "name": tab_info["name"],
             "key": tab_info["key"]
         },
+        "title": comment.title,
 
         "text": comment.text,
 
@@ -683,6 +684,10 @@ def create_comment_from_data(
     scene
 ):
 
+    title = data.get(
+        "title",
+        "Comment"
+    )
     text = data.get(
         "text",
         "Comment"
@@ -704,6 +709,7 @@ def create_comment_from_data(
     )
 
     comment = CommentItem(
+        title=title,
         text=text,
         width=width,
         height=height

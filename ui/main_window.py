@@ -300,9 +300,7 @@ class NExMainWindow(QWidget):
 
         try:
 
-            api.create_comment(
-                "Comment"
-            )
+            api.create_comment("Comment", "comment")
 
         except Exception as error:
 
