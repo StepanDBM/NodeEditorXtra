@@ -17,7 +17,8 @@ try:
         QVBoxLayout,
         QHBoxLayout,
         QLabel,
-        QFrame
+        QFrame,
+        QSplitter
     )
 
 except ImportError:
@@ -34,13 +35,15 @@ except ImportError:
         QVBoxLayout,
         QHBoxLayout,
         QLabel,
-        QFrame
+        QFrame,
+        QSplitter
     )
 
 
 import NEx_SDBM.api as api
 import NEx_SDBM.NEx_bootstrap as bootstrap
 from NEx_SDBM.ui.focus_list import FocusListWidget
+from NEx_SDBM.ui.minimap import MiniMapWidget
 
 def maya_main_window():
 
@@ -118,22 +121,103 @@ class NExMainWindow(QWidget):
 
         main_layout.addLayout(actions_layout)
 
+        # -------------------------------------------------
+        # Scene MiniMap
+        # -------------------------------------------------
+        content_splitter = QSplitter(
+            Qt.Vertical
+        )
+
+        mini_container = QWidget()
+        mini_layout = QVBoxLayout(
+            mini_container
+        )
+
+        mini_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
+
+        mini_layout.setSpacing(
+            4
+        )
+
+        mini_label = QLabel(
+            "Mini-map"
+        )
+
+        mini_layout.addWidget(
+            mini_label
+        )
+
+        self.minimap = MiniMapWidget()
+
+        mini_layout.addWidget(
+            self.minimap
+        )
+
+        focus_container = QWidget()
+        focus_layout = QVBoxLayout(
+            focus_container
+        )
+
+        focus_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
+
+        focus_layout.setSpacing(
+            4
+        )
 
         # -------------------------------------------------
         # Scene FocusOnList
         # -------------------------------------------------
         focus_label = QLabel(
-            "NEx Outliner"
+            "Focus-OnTree"
         )
 
-        main_layout.addWidget(
+        focus_layout.addWidget(
             focus_label
         )
 
         self.focus_list = FocusListWidget()
 
-        main_layout.addWidget(
+        focus_layout.addWidget(
             self.focus_list
+        )
+
+        content_splitter.addWidget(
+            mini_container
+        )
+
+        content_splitter.addWidget(
+            focus_container
+        )
+
+        content_splitter.setStretchFactor(
+            0,
+            1
+        )
+
+        content_splitter.setStretchFactor(
+            1,
+            2
+        )
+
+        content_splitter.setSizes(
+            [
+                180,
+                320
+            ]
+        )
+
+        main_layout.addWidget(
+            content_splitter
         )
         # -------------------------------------------------
         # Scene persistence
