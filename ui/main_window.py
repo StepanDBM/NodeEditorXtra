@@ -79,10 +79,12 @@ class NExMainWindow(QWidget):
         self.setMinimumWidth(
             280
         )
-
+        
         self.setWindowFlags(
-            Qt.Window
-            | Qt.WindowStaysOnTopHint
+            Qt.Tool
+            | Qt.Window
+            | Qt.WindowTitleHint
+            | Qt.WindowCloseButtonHint
         )
 
         self.build_ui()

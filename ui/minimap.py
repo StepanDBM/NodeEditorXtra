@@ -140,7 +140,7 @@ class MiniMapWidget(QWidget):
 
         # 1.0 = exact minimap position.
         # Lower values make dragging feel softer/slower.
-        self.pan_drag_strength = 0.75
+        self.pan_drag_strength = 0.25
 
         self.setMinimumHeight(
             100
