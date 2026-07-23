@@ -73,7 +73,7 @@ class NExMainWindow(QWidget):
         )
 
         self.setWindowTitle(
-            "NEx"
+            "NEx - Node Editor Extras"
         )
 
         self.setMinimumWidth(
@@ -94,29 +94,28 @@ class NExMainWindow(QWidget):
             self
         )
 
-        title = QLabel(
-            "NEx - Node Editor Extras"
-        )
-
-        main_layout.addWidget(
-            title
-        )
 
         # -------------------------------------------------
         # Main actions
         # -------------------------------------------------
+        
+        ActionsTitle = QLabel(
+            "NEx - Actions"
+        )
+
+        main_layout.addWidget(
+            ActionsTitle
+        )
         actions_layout = QHBoxLayout()
 
         self.create_backdrop_btn = QPushButton("Create")
         self.create_comment_btn = QPushButton("Comment")
         self.create_image_btn = QPushButton("Image")
-        self.delete_selected_btn = QPushButton("Delete")
         self.clear_all_btn = QPushButton("Clear All")
 
         actions_layout.addWidget(self.create_backdrop_btn)
         actions_layout.addWidget(self.create_comment_btn)
         actions_layout.addWidget(self.create_image_btn)
-        actions_layout.addWidget(self.delete_selected_btn)
         actions_layout.addWidget(self.clear_all_btn)
 
         main_layout.addLayout(actions_layout)
@@ -144,12 +143,44 @@ class NExMainWindow(QWidget):
             4
         )
 
+        mini_header_layout = QHBoxLayout()
+
         mini_label = QLabel(
-            "Mini-map"
+            "NEx - Mini Map"
         )
 
-        mini_layout.addWidget(
+        self.minimap_zoom_out_btn = QPushButton(
+            "-"
+        )
+
+        self.minimap_zoom_reset_btn = QPushButton(
+            "1:1"
+        )
+
+        self.minimap_zoom_in_btn = QPushButton(
+            "+"
+        )
+
+        mini_header_layout.addWidget(
             mini_label
+        )
+
+        mini_header_layout.addStretch()
+
+        mini_header_layout.addWidget(
+            self.minimap_zoom_out_btn
+        )
+
+        mini_header_layout.addWidget(
+            self.minimap_zoom_reset_btn
+        )
+
+        mini_header_layout.addWidget(
+            self.minimap_zoom_in_btn
+        )
+
+        mini_layout.addLayout(
+            mini_header_layout
         )
 
         self.minimap = MiniMapWidget()
@@ -178,7 +209,7 @@ class NExMainWindow(QWidget):
         # Scene FocusOnList
         # -------------------------------------------------
         focus_label = QLabel(
-            "Focus-OnTree"
+            "NEx - Outliner"
         )
 
         focus_layout.addWidget(
@@ -306,7 +337,19 @@ class NExMainWindow(QWidget):
         )
 
     def create_connections(self):
+        self.minimap_zoom_out_btn.clicked.connect(
+            self.minimap.zoom_out
+        )
 
+        self.minimap_zoom_reset_btn.clicked.connect(
+            self.minimap.reset_zoom
+        )
+
+        self.minimap_zoom_in_btn.clicked.connect(
+            self.minimap.zoom_in
+        )
+
+        
         self.create_backdrop_btn.clicked.connect(
             self._create_backdrop_from_selection_deferred
         )
@@ -315,9 +358,6 @@ class NExMainWindow(QWidget):
         )
         self.create_image_btn.clicked.connect(
             self.create_image
-        )
-        self.delete_selected_btn.clicked.connect(
-            self.delete_selected_backdrops
         )
         self.clear_all_btn.clicked.connect(
             self.clear_all_backdrops
@@ -405,19 +445,6 @@ class NExMainWindow(QWidget):
 
             print(
                 "NEx | Could not create image:",
-                error
-            )
-            
-    def delete_selected_backdrops(self):
-
-        try:
-
-            api.delete_selected_backdrops()
-
-        except Exception as error:
-
-            print(
-                "NEx | Could not delete backdrop:",
                 error
             )
 
@@ -519,7 +546,57 @@ class NExMainWindow(QWidget):
 
         except Exception:
             pass
+        try:
 
+            import __main__
+
+            focus_filter = getattr(
+                __main__,
+                "NEX_FOCUS_FILTER",
+                None
+            )
+
+            if focus_filter:
+
+                focus_filter.uninstall()
+
+                __main__.NEX_FOCUS_FILTER = None
+
+        except Exception:
+            pass
+
+
+        try:
+
+            import __main__
+
+            tab_observer = getattr(
+                __main__,
+                "NEX_TAB_OBSERVER",
+                None
+            )
+
+            if tab_observer:
+
+                tab_observer.uninstall()
+
+                __main__.NEX_TAB_OBSERVER = None
+
+        except Exception:
+            pass
+
+
+        try:
+
+            if hasattr(
+                self,
+                "minimap"
+            ):
+
+                self.minimap.uninstall_view_filter()
+
+        except Exception:
+            pass
         super().closeEvent(
             event
         )

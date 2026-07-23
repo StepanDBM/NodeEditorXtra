@@ -71,6 +71,17 @@ class MiniMapViewFilter(QObject):
 
         event_type = event.type()
 
+        if event_type == QEvent.Destroy:
+
+            try:
+
+                self.minimap.on_node_editor_view_destroyed()
+
+            except Exception:
+                pass
+
+            return False
+
         watched_events = (
             QEvent.MouseButtonPress,
             QEvent.MouseButtonRelease,
@@ -83,7 +94,12 @@ class MiniMapViewFilter(QObject):
 
         if event_type in watched_events:
 
-            self.minimap.schedule_refresh()
+            try:
+
+                self.minimap.schedule_refresh()
+
+            except Exception:
+                pass
 
         return False
 
@@ -116,6 +132,11 @@ class MiniMapWidget(QWidget):
         )
 
         self.padding = 8
+
+        self.minimap_zoom = 1.0
+        self.minimap_zoom_min = 0.25
+        self.minimap_zoom_max = 8.0
+        self.minimap_zoom_step = 1.25
 
         # 1.0 = exact minimap position.
         # Lower values make dragging feel softer/slower.
@@ -195,7 +216,11 @@ class MiniMapWidget(QWidget):
 
         self._refresh_pending = False
 
-        self.scene_bounds = self.compute_scene_bounds()
+        base_bounds = self.compute_scene_bounds()
+
+        self.scene_bounds = self.apply_minimap_zoom_to_bounds(
+            base_bounds
+        )
 
         self.update()
 
@@ -206,6 +231,10 @@ class MiniMapWidget(QWidget):
     def reconnect_view(self):
 
         self.uninstall_view_filter()
+
+        self.scene = None
+        self.view = None
+        self.scene_bounds = None
 
         try:
 
@@ -227,6 +256,7 @@ class MiniMapWidget(QWidget):
 
         self.install_view_filter()
 
+
     def install_view_filter(self):
 
         if not self.view:
@@ -243,21 +273,50 @@ class MiniMapWidget(QWidget):
 
         try:
 
-            self.view.viewport().installEventFilter(
-                self.view_filter
+            viewport = self.view.viewport()
+
+            if viewport:
+
+                viewport.installEventFilter(
+                    self.view_filter
+                )
+
+        except Exception:
+            pass
+
+        try:
+
+            self.view.destroyed.connect(
+                self.on_node_editor_view_destroyed
             )
 
         except Exception:
             pass
 
+        try:
+
+            viewport = self.view.viewport()
+
+            if viewport:
+
+                viewport.destroyed.connect(
+                    self.on_node_editor_view_destroyed
+                )
+
+        except Exception:
+            pass
+
+
     def uninstall_view_filter(self):
 
-        if not self.view:
+        view = self.view
+
+        if not view:
             return
 
         try:
 
-            self.view.removeEventFilter(
+            view.removeEventFilter(
                 self.view_filter
             )
 
@@ -266,9 +325,37 @@ class MiniMapWidget(QWidget):
 
         try:
 
-            self.view.viewport().removeEventFilter(
-                self.view_filter
-            )
+            viewport = view.viewport()
+
+            if viewport:
+
+                viewport.removeEventFilter(
+                    self.view_filter
+                )
+
+        except Exception:
+            pass
+
+
+    def on_node_editor_view_destroyed(
+        self,
+        *args
+    ):
+
+        try:
+
+            self.uninstall_view_filter()
+
+        except Exception:
+            pass
+
+        self.view = None
+        self.scene = None
+        self.scene_bounds = None
+
+        try:
+
+            self.update()
 
         except Exception:
             pass
@@ -700,7 +787,107 @@ class MiniMapWidget(QWidget):
             )
             / scale
         )
+    # -----------------------------------------------------
+    # Extra Minimap Zoom
+    # -----------------------------------------------------
 
+    def get_minimap_zoom_center(
+        self,
+        bounds
+    ):
+
+        viewport_center = self.get_viewport_scene_center()
+
+        if viewport_center is not None:
+            return viewport_center
+
+        if bounds:
+            return bounds.center()
+
+        return QPointF(
+            0,
+            0
+        )
+
+
+    def apply_minimap_zoom_to_bounds(
+        self,
+        bounds
+    ):
+
+        if not bounds:
+            return None
+
+        zoom = max(
+            self.minimap_zoom_min,
+            min(
+                self.minimap_zoom,
+                self.minimap_zoom_max
+            )
+        )
+
+        if zoom == 1.0:
+            return bounds
+
+        center = self.get_minimap_zoom_center(
+            bounds
+        )
+
+        width = (
+            bounds.width()
+            / zoom
+        )
+
+        height = (
+            bounds.height()
+            / zoom
+        )
+
+        return QRectF(
+            center.x() - width * 0.5,
+            center.y() - height * 0.5,
+            width,
+            height
+        )
+
+
+    def set_minimap_zoom(
+        self,
+        zoom
+    ):
+
+        self.minimap_zoom = max(
+            self.minimap_zoom_min,
+            min(
+                zoom,
+                self.minimap_zoom_max
+            )
+        )
+
+        self.schedule_refresh()
+
+
+    def zoom_in(self):
+
+        self.set_minimap_zoom(
+            self.minimap_zoom
+            * self.minimap_zoom_step
+        )
+
+
+    def zoom_out(self):
+
+        self.set_minimap_zoom(
+            self.minimap_zoom
+            / self.minimap_zoom_step
+        )
+
+
+    def reset_zoom(self):
+
+        self.set_minimap_zoom(
+            1.0
+        )
     # -----------------------------------------------------
     # Viewport minimap helpers
     # -----------------------------------------------------
@@ -1173,3 +1360,40 @@ class MiniMapWidget(QWidget):
             return
 
         event.accept()
+
+    def wheelEvent(
+        self,
+        event
+    ):
+
+        try:
+
+            delta = event.angleDelta().y()
+
+        except Exception:
+
+            delta = 0
+
+        if delta > 0:
+
+            self.zoom_in()
+
+        elif delta < 0:
+
+            self.zoom_out()
+
+        event.accept()
+
+    def on_node_editor_view_destroyed(self):
+        try:
+
+            self.uninstall_view_filter()
+
+        except Exception:
+            pass
+
+        self.view = None
+        self.scene = None
+        self.scene_bounds = None
+
+        self.update()

@@ -9,18 +9,26 @@ from NEx_SDBM.ui.main_window import (
 
 
 def show():
+    import NEx_SDBM.core.utilities.events as events
+    import NEx_SDBM.core.scene_view as scene_view
+    import NEx_SDBM.core.tab_observer as tab_observer
 
     try:
-
         __main__.NEX_WINDOW.close()
         __main__.NEX_WINDOW.deleteLater()
 
     except Exception:
         pass
 
-    __main__.NEX_WINDOW = NExMainWindow(
-        parent=maya_main_window()
-    )
+    try:
+        events.reset_event_bus()
+    except Exception as error:
+        print(
+            "NEx | Could not reset event bus:",
+            error
+        )
+
+    __main__.NEX_WINDOW = NExMainWindow(parent=maya_main_window())
 
     __main__.NEX_WINDOW.show()
     __main__.NEX_WINDOW.raise_()
@@ -29,30 +37,13 @@ def show():
 
 
     try:
-
-        import NEx_SDBM.core.scene_view as scene_view
         scene_view.install_nex_focus_filter()
-
     except Exception as error:
-
         print(
             "NEx | Could not install focus filter:",
             error
         )
-    """try:
-
-        import NEx_SDBM.core.tab_watcher as tab_watcher
-
-        tab_watcher.install_tab_watcher()
-
-    except Exception as error:
-
-        print(
-            "NEx | Could not install tab watcher:",
-            error
-        )"""
     try:
-        import NEx_SDBM.core.tab_observer as tab_observer
         tab_observer.install_tab_observer()
     except Exception as error:
         print(

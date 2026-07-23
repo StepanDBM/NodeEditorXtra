@@ -24,6 +24,8 @@ class NExEventBus(QObject):
     items_changed = Signal()
     item_changed = Signal(object)
 
+    node_editor_closed = Signal()
+
     def __init__(self):
 
         super().__init__()
@@ -103,3 +105,28 @@ def emit_item_changed(
     get_event_bus().emit_item_changed(
         item
     )
+
+def emit_node_editor_closed():
+
+    get_event_bus().node_editor_closed.emit()
+
+def reset_event_bus():
+
+    old_bus = getattr(
+        __main__,
+        "NEX_EVENT_BUS",
+        None
+    )
+
+    if old_bus is not None:
+
+        try:
+
+            old_bus.deleteLater()
+
+        except Exception:
+            pass
+
+    __main__.NEX_EVENT_BUS = NExEventBus()
+
+    return __main__.NEX_EVENT_BUS

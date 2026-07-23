@@ -17,7 +17,8 @@ try:
         QComboBox,
         QAbstractItemView,
         QTreeWidget,
-        QTreeWidgetItem
+        QTreeWidgetItem,
+        QHeaderView
     )
 
 except ImportError:
@@ -37,7 +38,8 @@ except ImportError:
         QComboBox,
         QAbstractItemView,
         QTreeWidget,
-        QTreeWidgetItem
+        QTreeWidgetItem,
+        QHeaderView
     )
 
 
@@ -49,6 +51,10 @@ import NEx_SDBM.core.utilities.events as events
 class FocusListWidget(QWidget):
 
     ITEM_ROLE = Qt.UserRole
+    KIND_ROLE = Qt.UserRole + 1
+
+    KIND_NEX_ITEM = "nex_item"
+    KIND_NATIVE_NODE = "native_node"
 
     def __init__(
         self,
@@ -109,6 +115,16 @@ class FocusListWidget(QWidget):
             ]
         )
 
+        self.tree.header().setSectionResizeMode(
+            0,
+            QHeaderView.Interactive
+        )
+
+        self.tree.header().setSectionResizeMode(
+            1,
+            QHeaderView.Interactive
+        )
+
         self.tree.setMinimumHeight(
             180
         )
@@ -142,10 +158,6 @@ class FocusListWidget(QWidget):
 
         self.tree.itemChanged.connect(
             self.on_tree_item_changed
-        )
-
-        self.tree.itemCollapsed.connect(
-            self.on_item_collapsed
         )
 
         bus = events.get_event_bus()
@@ -195,6 +207,16 @@ class FocusListWidget(QWidget):
             except Exception:
 
                 tab_infos = []
+
+            if not tab_infos:
+
+                self.tab_combo.addItem(
+                    "Open a Node Editor",
+                    None
+                )
+
+                self.current_tab_info = None
+                return
 
             current_tab = self.get_current_maya_tab_info()
 
@@ -384,6 +406,55 @@ class FocusListWidget(QWidget):
 
             return None
 
+
+    def get_scene_native_node_items(self):
+
+        scene = self.get_current_scene()
+
+        if not scene:
+            return []
+
+        try:
+
+            scene_items = scene.items()
+
+        except RuntimeError:
+            return []
+
+        except Exception:
+            return []
+
+        result = []
+
+        for item in scene_items:
+
+            if NEx.is_nex_item(
+                item
+            ):
+                continue
+
+            try:
+
+                node_name = NEx.get_node_name(
+                    item
+                )
+
+            except Exception:
+
+                node_name = None
+
+            if not node_name:
+                continue
+
+            result.append(
+                (
+                    node_name,
+                    item
+                )
+            )
+
+        return result
+
     def get_scene_nex_items(self):
 
         scene = self.get_current_scene()
@@ -445,52 +516,127 @@ class FocusListWidget(QWidget):
 
         return None
 
-    def build_hierarchy(self):
+    def get_direct_container_for_native_node(
+        self,
+        node_item,
+        containers
+    ):
 
-        items = self.get_scene_nex_items()
+        try:
 
-        item_set = set(
-            items
+            node_rect = node_item.sceneBoundingRect()
+
+        except RuntimeError:
+            return None
+
+        except Exception:
+            return None
+
+        candidates = []
+
+        for container in containers:
+
+            try:
+
+                if container.sceneBoundingRect().contains(
+                    node_rect
+                ):
+
+                    candidates.append(
+                        container
+                    )
+
+            except RuntimeError:
+                continue
+
+            except Exception:
+                continue
+
+        if not candidates:
+            return None
+
+        candidates = sorted(
+            candidates,
+            key=lambda item: item.get_area()
         )
 
-        children_by_parent = {}
-        roots = []
+        return candidates[0]
 
-        for item in items:
 
-            parent = self.get_parent_for_item(
-                item,
-                item_set
+    def create_native_node_tree_item(
+        self,
+        node_name,
+        node_item
+    ):
+
+        tree_item = QTreeWidgetItem(
+            [
+                "Maya Node",
+                node_name
+            ]
+        )
+
+        tree_item.setData(
+            0,
+            self.ITEM_ROLE,
+            node_item
+        )
+
+        tree_item.setData(
+            1,
+            self.ITEM_ROLE,
+            node_item
+        )
+
+        tree_item.setData(
+            0,
+            self.KIND_ROLE,
+            self.KIND_NATIVE_NODE
+        )
+
+        tree_item.setData(
+            1,
+            self.KIND_ROLE,
+            self.KIND_NATIVE_NODE
+        )
+
+        tree_item.setFlags(
+            tree_item.flags()
+            & ~Qt.ItemIsEditable
+        )
+
+        background = QBrush(
+            QColor(
+                70,
+                70,
+                70,
+                170
             )
-
-            if parent is None:
-
-                roots.append(
-                    item
-                )
-
-            else:
-
-                children_by_parent.setdefault(
-                    parent,
-                    []
-                ).append(
-                    item
-                )
-
-        roots = self.sort_items(
-            roots
         )
 
-        for parent, children in list(
-            children_by_parent.items()
+        foreground = QBrush(
+            QColor(
+                220,
+                220,
+                220
+            )
+        )
+
+        for column in range(
+            self.tree.columnCount()
         ):
 
-            children_by_parent[parent] = self.sort_items(
-                children
+            tree_item.setBackground(
+                column,
+                background
             )
 
-        return roots, children_by_parent
+            tree_item.setForeground(
+                column,
+                foreground
+            )
+
+        return tree_item
 
     # -----------------------------------------------------
     # Sorting / labels
@@ -599,6 +745,30 @@ class FocusListWidget(QWidget):
             180
         )
 
+    def resize_tree_columns(self):
+
+        width = self.tree.viewport().width()
+
+        type_width = int(
+            width
+            * 0.50
+        )
+
+        title_width = (
+            width
+            - type_width
+        )
+
+        self.tree.setColumnWidth(
+            0,
+            type_width
+        )
+
+        self.tree.setColumnWidth(
+            1,
+            title_width
+        )
+
     def apply_row_style(
         self,
         tree_item,
@@ -665,6 +835,18 @@ class FocusListWidget(QWidget):
             nex_item
         )
 
+        tree_item.setData(
+            0,
+            self.KIND_ROLE,
+            self.KIND_NEX_ITEM
+        )
+
+        tree_item.setData(
+            1,
+            self.KIND_ROLE,
+            self.KIND_NEX_ITEM
+        )
+
         tree_item.setFlags(
             tree_item.flags()
             | Qt.ItemIsEditable
@@ -676,6 +858,191 @@ class FocusListWidget(QWidget):
         )
 
         return tree_item
+
+    def build_hierarchy(self):
+
+        items = self.get_scene_nex_items()
+
+        item_set = set(
+            items
+        )
+
+        children_by_parent = {}
+        roots = []
+
+        # -----------------------------------------------------
+        # NEx item hierarchy
+        # -----------------------------------------------------
+
+        for item in items:
+
+            parent = self.get_parent_for_item(
+                item,
+                item_set
+            )
+
+            if parent is None:
+
+                roots.append(
+                    item
+                )
+
+            else:
+
+                children_by_parent.setdefault(
+                    parent,
+                    []
+                ).append(
+                    item
+                )
+
+        # -----------------------------------------------------
+        # Native Maya nodes under direct NEx container
+        # -----------------------------------------------------
+
+        containers = [
+            item
+            for item in items
+            if getattr(
+                item,
+                "nex_container",
+                False
+            )
+        ]
+
+        native_nodes = self.get_scene_native_node_items()
+
+        native_nodes_by_parent = {}
+
+        for node_name, node_item in native_nodes:
+
+            parent = self.get_direct_container_for_native_node(
+                node_item,
+                containers
+            )
+
+            if parent is None:
+                continue
+
+            native_nodes_by_parent.setdefault(
+                parent,
+                []
+            ).append(
+                (
+                    node_name,
+                    node_item
+                )
+            )
+
+        roots = self.sort_items(
+            roots
+        )
+
+        for parent, children in list(
+            children_by_parent.items()
+        ):
+
+            children_by_parent[parent] = self.sort_items(
+                children
+            )
+
+        for parent, nodes in list(
+            native_nodes_by_parent.items()
+        ):
+
+            native_nodes_by_parent[parent] = sorted(
+                nodes,
+                key=lambda data: data[0].lower()
+            )
+
+        return (
+            roots,
+            children_by_parent,
+            native_nodes_by_parent
+        )
+
+    def tree_item_has_nex_child(
+        self,
+        tree_item
+    ):
+
+        for index in range(
+            tree_item.childCount()
+        ):
+
+            child = tree_item.child(
+                index
+            )
+
+            kind = child.data(
+                0,
+                self.KIND_ROLE
+            )
+
+            if kind == self.KIND_NEX_ITEM:
+                return True
+
+        return False
+
+
+    def apply_initial_expansion_to_item(
+        self,
+        tree_item
+    ):
+
+        kind = tree_item.data(
+            0,
+            self.KIND_ROLE
+        )
+
+        if kind != self.KIND_NEX_ITEM:
+            return
+
+        has_nex_child = self.tree_item_has_nex_child(
+            tree_item
+        )
+
+        if has_nex_child:
+
+            tree_item.setExpanded(
+                True
+            )
+
+            for index in range(
+                tree_item.childCount()
+            ):
+
+                child = tree_item.child(
+                    index
+                )
+
+                self.apply_initial_expansion_to_item(
+                    child
+                )
+
+        else:
+
+            # This keeps native Maya node lists hidden by default
+            # when this NEx item has no NEx children.
+            tree_item.setExpanded(
+                False
+            )
+
+
+    def apply_initial_expansion(self):
+
+        for index in range(
+            self.tree.topLevelItemCount()
+        ):
+
+            tree_item = self.tree.topLevelItem(
+                index
+            )
+
+            self.apply_initial_expansion_to_item(
+                tree_item
+            )
+
 
     def refresh_tree(self):
 
@@ -692,7 +1059,7 @@ class FocusListWidget(QWidget):
 
             self.tree.clear()
 
-            roots, children_by_parent = (
+            roots, children_by_parent, native_nodes_by_parent = (
                 self.build_hierarchy()
             )
 
@@ -709,14 +1076,13 @@ class FocusListWidget(QWidget):
                 self.populate_children(
                     tree_item,
                     root,
-                    children_by_parent
+                    children_by_parent,
+                    native_nodes_by_parent
                 )
 
-            self.tree.expandAll()
+            self.apply_initial_expansion()
 
-            self.tree.resizeColumnToContents(
-                0
-            )
+            self.resize_tree_columns()
 
         finally:
 
@@ -726,12 +1092,28 @@ class FocusListWidget(QWidget):
 
             self._refreshing = False
 
+    def resizeEvent(
+        self,
+        event
+    ):
+
+        super().resizeEvent(
+            event
+        )
+
+        self.resize_tree_columns()
+
     def populate_children(
         self,
         parent_tree_item,
         parent_nex_item,
-        children_by_parent
+        children_by_parent,
+        native_nodes_by_parent
     ):
+
+        # -----------------------------------------------------
+        # Child NEx items first
+        # -----------------------------------------------------
 
         children = children_by_parent.get(
             parent_nex_item,
@@ -751,21 +1133,33 @@ class FocusListWidget(QWidget):
             self.populate_children(
                 child_tree_item,
                 child,
-                children_by_parent
+                children_by_parent,
+                native_nodes_by_parent
+            )
+
+        # -----------------------------------------------------
+        # Direct native Maya nodes under this container
+        # -----------------------------------------------------
+
+        native_nodes = native_nodes_by_parent.get(
+            parent_nex_item,
+            []
+        )
+
+        for node_name, node_item in native_nodes:
+
+            node_tree_item = self.create_native_node_tree_item(
+                node_name,
+                node_item
+            )
+
+            parent_tree_item.addChild(
+                node_tree_item
             )
 
     # -----------------------------------------------------
     # Tree events
     # -----------------------------------------------------
-
-    def on_item_collapsed(
-        self,
-        tree_item
-    ):
-
-        self.tree.expandItem(
-            tree_item
-        )
 
     def on_item_double_clicked(
         self,
@@ -773,12 +1167,12 @@ class FocusListWidget(QWidget):
         column
     ):
 
-        nex_item = tree_item.data(
+        scene_item = tree_item.data(
             0,
             self.ITEM_ROLE
         )
 
-        if not nex_item:
+        if not scene_item:
             return
 
         tab_info = self.current_tab_info
@@ -800,7 +1194,7 @@ class FocusListWidget(QWidget):
         QTimer.singleShot(
             100,
             lambda: scene_view.frame_view_on_item(
-                nex_item
+                scene_item
             )
         )
 
@@ -814,6 +1208,14 @@ class FocusListWidget(QWidget):
             return
 
         if column != 1:
+            return
+
+        kind = tree_item.data(
+            0,
+            self.KIND_ROLE
+        )
+
+        if kind != self.KIND_NEX_ITEM:
             return
 
         nex_item = tree_item.data(

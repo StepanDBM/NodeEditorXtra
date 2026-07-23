@@ -242,7 +242,8 @@ class NExNodeEditorFocusFilter(QObject):
         obj,
         event
     ):
-
+        if event.type() == QEvent.Destroy:
+            return False
         if event.type() != QEvent.KeyPress:
             return False
 
@@ -309,13 +310,41 @@ class NExNodeEditorFocusFilter(QObject):
                 self
             )
 
-            view.viewport().installEventFilter(
-                self
-            )
+            viewport = view.viewport()
+
+            if viewport:
+
+                viewport.installEventFilter(
+                    self
+                )
 
             self.views.append(
                 view
             )
+
+            try:
+
+                view.destroyed.connect(
+                    lambda *args, view=view: self.remove_dead_view(
+                        view
+                    )
+                )
+
+            except Exception:
+                pass
+
+            try:
+
+                if viewport:
+
+                    viewport.destroyed.connect(
+                        lambda *args, view=view: self.remove_dead_view(
+                            view
+                        )
+                    )
+
+            except Exception:
+                pass
 
         except RuntimeError:
             pass
@@ -323,6 +352,26 @@ class NExNodeEditorFocusFilter(QObject):
         except Exception:
             pass
 
+
+    def remove_dead_view(
+        self,
+        view
+    ):
+
+        cleaned = []
+
+        for existing_view in list(
+            self.views
+        ):
+
+            if existing_view is view:
+                continue
+
+            cleaned.append(
+                existing_view
+            )
+
+        self.views = cleaned
 
     def uninstall(self):
 

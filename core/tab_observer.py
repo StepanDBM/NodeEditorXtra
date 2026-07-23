@@ -38,6 +38,8 @@ class NExTabObserver(QObject):
 
         self._check_pending = False
 
+        self._destroying = False
+
     # -----------------------------------------------------
     # Install / uninstall
     # -----------------------------------------------------
@@ -130,6 +132,42 @@ class NExTabObserver(QObject):
 
             except Exception:
                 pass
+
+            try:
+
+                target.destroyed.connect(
+                    self.on_node_editor_target_destroyed
+                )
+
+            except Exception:
+                pass
+
+
+    def on_node_editor_target_destroyed(
+        self,
+        *args
+    ):
+
+        if self._destroying:
+            return
+
+        self._destroying = True
+
+        try:
+
+            self.uninstall()
+
+        except Exception:
+            pass
+
+        try:
+
+            events.emit_node_editor_closed()
+
+        except Exception:
+            pass
+
+        self._destroying = False
 
     def remove_filters(self):
 
@@ -337,6 +375,12 @@ class NExTabObserver(QObject):
 
         event_type = event.type()
 
+        if event_type == QEvent.Destroy:
+
+            self.on_node_editor_target_destroyed()
+
+            return False
+
         watched_events = (
             QEvent.MouseButtonRelease,
             QEvent.MouseButtonDblClick,
@@ -353,10 +397,7 @@ class NExTabObserver(QObject):
 
             self.schedule_check()
 
-        # Important:
-        # Never consume Maya events.
         return False
-
 
 def install_tab_observer():
 
