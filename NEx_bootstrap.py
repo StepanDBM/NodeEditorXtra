@@ -5,11 +5,13 @@ from importlib import reload
 
 
 MODULES_TO_RELOAD = [
-
     # Core
     "NEx_SDBM.core.node_editor",
     "NEx_SDBM.core.scene_storage",
+    "NEx_SDBM.core.scene_view",
+    "NEx_SDBM.core.tab_observer",
     "NEx_SDBM.core.utilities.undoChunk",
+    "NEx_SDBM.core.utilities.events",
 
     # Items base first
     "NEx_SDBM.items.nex_item",
@@ -22,7 +24,8 @@ MODULES_TO_RELOAD = [
     # Serializer after items
     "NEx_SDBM.core.serializer",
 
-    # UI
+    # UI dependencies first
+    "NEx_SDBM.ui.focus_list",
     "NEx_SDBM.ui.backdrop_editor",
     "NEx_SDBM.ui.minimap",
     "NEx_SDBM.ui.search",
@@ -42,26 +45,27 @@ def reload_all():
 
     for module_name in MODULES_TO_RELOAD:
 
-        if module_name in sys.modules:
+        if module_name not in sys.modules:
+            continue
 
-            try:
+        try:
 
-                reload(
-                    sys.modules[module_name]
+            reload(
+                sys.modules[module_name]
+            )
+
+            reloaded.append(
+                module_name
+            )
+
+        except Exception as error:
+
+            print(
+                "NEx | Could not reload {}: {}".format(
+                    module_name,
+                    error
                 )
-
-                reloaded.append(
-                    module_name
-                )
-
-            except Exception as error:
-
-                print(
-                    "NEx | Could not reload {}: {}".format(
-                        module_name,
-                        error
-                    )
-                )
+            )
 
     print(
         "NEx | Reloaded modules:"

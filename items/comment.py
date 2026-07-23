@@ -37,9 +37,7 @@ except ImportError:
     )
 
 
-from NEx_SDBM.items.nex_item import (
-    NExGraphicsItem
-)
+from NEx_SDBM.items.nex_item import NExGraphicsItem
 
 
 class CommentTextEditor(QGraphicsTextItem):

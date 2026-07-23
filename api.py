@@ -5,6 +5,7 @@ from maya import cmds
 
 import NEx_SDBM.core.node_editor as NEx
 import NEx_SDBM.core.serializer as serializer
+import NEx_SDBM.core.utilities.events as events
 
 import NEx_SDBM.core.scene_storage as scene_storage
 from NEx_SDBM.items.backdrop import BackdropItem
@@ -26,8 +27,17 @@ def clear_nex_selection():
     scene.clearSelection()
 
 
+# -----------------------------------------------------
+# FocusViewList Event Abstraction
+# -----------------------------------------------------
 
+def notify_items_changed():
 
+    try:
+        events.emit_items_changed()
+
+    except Exception:
+        pass
 # ---------------------------------------------------------
 # BackDropSpecific Actions
 # ---------------------------------------------------------
@@ -61,14 +71,14 @@ def delete_selected_backdrops():
 
         except Exception:
             pass
-
+    notify_items_changed()
     print(
         "NEx | Deleted {} item(s)".format(
             deleted_count
         )
     )
 
-
+"""
 def create_backdrop(title="First Prototype"):
     #with unDo("NEx Create Backdrop"):
     scene = NEx.get_scene()
@@ -79,7 +89,7 @@ def create_backdrop(title="First Prototype"):
     _NEX_ITEMS.append(backdrop)
 
     return backdrop
-
+"""
 
 def create_backdrop_from_selection(title="New Group"):
 
@@ -148,6 +158,7 @@ def create_backdrop_from_selection(title="New Group"):
         backdrop
     )
 
+    notify_items_changed()
     return backdrop
 
 
@@ -160,6 +171,7 @@ def clear_all_NExItems():
         if item not in removed
     ]
 
+    notify_items_changed()
     print(
         "NEx | Cleared {} item(s)".format(
             len(removed)
@@ -215,7 +227,7 @@ def create_comment(
     _NEX_ITEMS.append(
         comment
     )
-
+    notify_items_changed()
     return comment
 
 
@@ -341,7 +353,7 @@ def load_all(
     _NEX_ITEMS.extend(
         created
     )
-
+    notify_items_changed()
     return created
 
 
@@ -357,9 +369,7 @@ def save_all_dialog():
     if not result:
         return None
 
-    return save_all(
-        result[0]
-    )
+    return save_all(result[0])
 
 
 def load_all_dialog():
@@ -373,7 +383,7 @@ def load_all_dialog():
 
     if not result:
         return None
-
+    notify_items_changed()
     return load_all(
         result[0],
         clear_existing=True
@@ -494,7 +504,7 @@ def create_image(
     _NEX_ITEMS.append(
         image
     )
-
+    notify_items_changed()
     return image
 
 # ---------------------------------------------------------

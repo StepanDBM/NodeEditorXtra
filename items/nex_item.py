@@ -198,6 +198,7 @@ class NExGraphicsItem(QGraphicsItem):
         )
 
         self.normal_border_alpha = 180
+        self.normal_header_darker_factor = 160
         self.normal_border_darker_factor = 1000
 
         self.hover_lighter_factor = 120
@@ -349,6 +350,7 @@ class NExGraphicsItem(QGraphicsItem):
             scene.removeItem(
                 self
             )
+        self.notify_items_changed() #eventHandler
 
 
     def paint_close_button(
@@ -689,17 +691,37 @@ class NExGraphicsItem(QGraphicsItem):
             self.update_z_for_item(
                 item
             )
-    """
+
+
     # -----------------------------------------------------
-    # FocusView Abstraction
+    # FocusViewList Event Abstraction
     # -----------------------------------------------------
 
-    def center_view_on_self(self):
+    def notify_item_changed(self):
 
-        return NEx.center_view_on_item(
-            self
-        )
-    """
+        try:
+
+            import NEx_SDBM.core.utilities.events as events
+
+            events.emit_item_changed(
+                self
+            )
+
+        except Exception:
+            pass
+
+
+    def notify_items_changed(self):
+
+        try:
+
+            import NEx_SDBM.core.utilities.events as events
+
+            events.emit_items_changed()
+
+        except Exception:
+            pass
+        
     # -----------------------------------------------------
     # Hierarchy
     # -----------------------------------------------------
@@ -1265,13 +1287,29 @@ class NExGraphicsItem(QGraphicsItem):
         )
 
         self.update()
+        self.notify_item_changed() #eventHandler
 
     def on_color_changed(
         self,
         picked_color
     ):
 
-        pass
+        header_alpha = (
+            self.header_color.alpha()
+        )
+
+        header_color = QColor(
+            picked_color
+        ).darker(
+            self.normal_header_darker_factor
+        )
+
+        header_color.setAlpha(
+            header_alpha
+        )
+
+        self.header_color = header_color
+
     def on_body_double_click(
         self,
         event
@@ -1318,7 +1356,7 @@ class NExGraphicsItem(QGraphicsItem):
             if new_title:
                 self.title = new_title
                 self.on_title_changed()
-
+        self.notify_item_changed() #eventHandler
         scene = self.scene()
 
         try:
@@ -1447,6 +1485,7 @@ class NExGraphicsItem(QGraphicsItem):
 
         self.clear_interaction_state()
         self.update_z_hierarchy()
+        self.notify_item_changed() #eventHandler
 
         super().mouseReleaseEvent(
             event

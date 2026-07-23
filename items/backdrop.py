@@ -262,27 +262,6 @@ class BackdropItem(NExGraphicsItem):
 
         return self.header_color
 
-    def on_color_changed(
-        self,
-        picked_color
-    ):
-
-        header_alpha = (
-            self.header_color.alpha()
-        )
-
-        header_color = QColor(
-            picked_color
-        ).darker(
-            160
-        )
-
-        header_color.setAlpha(
-            header_alpha
-        )
-
-        self.header_color = header_color
-
     # -----------------------------------------------------
     # Auto grow on resize-release
     # -----------------------------------------------------

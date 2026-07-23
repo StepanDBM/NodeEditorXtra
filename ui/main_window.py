@@ -3,10 +3,6 @@
 from maya import OpenMayaUI
 from maya import cmds
 
-import NEx_SDBM.api as api
-import NEx_SDBM.NEx_bootstrap as bootstrap
-
-
 try:
     from shiboken2 import wrapInstance
 
@@ -41,6 +37,10 @@ except ImportError:
         QFrame
     )
 
+
+import NEx_SDBM.api as api
+import NEx_SDBM.NEx_bootstrap as bootstrap
+from NEx_SDBM.ui.focus_list import FocusListWidget
 
 def maya_main_window():
 
@@ -118,6 +118,23 @@ class NExMainWindow(QWidget):
 
         main_layout.addLayout(actions_layout)
 
+
+        # -------------------------------------------------
+        # Scene FocusOnList
+        # -------------------------------------------------
+        focus_label = QLabel(
+            "NEx Outliner"
+        )
+
+        main_layout.addWidget(
+            focus_label
+        )
+
+        self.focus_list = FocusListWidget()
+
+        main_layout.addWidget(
+            self.focus_list
+        )
         # -------------------------------------------------
         # Scene persistence
         # -------------------------------------------------
@@ -155,7 +172,7 @@ class NExMainWindow(QWidget):
         )
 
         self.load_btn = QPushButton(
-            "Load .nex"
+            "Import"
         )
 
         file_layout.addWidget(

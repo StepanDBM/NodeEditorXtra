@@ -12,13 +12,24 @@ except ImportError:
 
 
 import NEx_SDBM.core.node_editor as NEx
+import NEx_SDBM.core.utilities.events as events
+
 from NEx_SDBM.items.backdrop import BackdropItem
 from NEx_SDBM.items.comment import CommentItem
 from NEx_SDBM.items.image import ImageItem
 
-
 NEX_VERSION = 2
 
+# ---------------------------------------------------------
+# Event Detection Actions
+# ---------------------------------------------------------
+def notify_items_changed():
+
+    try:
+        events.emit_items_changed()
+
+    except Exception:
+        pass
 
 # ---------------------------------------------------------
 # Type Detection Actions
@@ -1112,7 +1123,7 @@ def load_tabs_from_data(data):
 
         except Exception:
             pass
-
+    notify_items_changed()
     return created
 
 
@@ -1206,5 +1217,5 @@ def clear_all_tab_backdrops():
                 items
             )
         )
-
+    notify_items_changed()
     return removed

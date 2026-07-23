@@ -83,7 +83,7 @@ def get_search_root_widget():
 
 
 # ---------------------------------------------------------
-# Stack / Tabs
+# Node Editor Stack
 # ---------------------------------------------------------
 
 def _safe_count(widget):
@@ -210,6 +210,100 @@ def get_stack():
     return stacks[0]
 
 
+
+
+# ---------------------------------------------------------
+# Tabs For Detection Helpers.
+# ---------------------------------------------------------
+
+
+def get_tab_infos():
+
+    return get_all_tab_infos()
+
+
+def get_current_tab_info():
+
+    return get_tab_info(
+        get_current_tab_index()
+    )
+
+
+def set_current_tab_by_index(
+    tab_index
+):
+
+    try:
+
+        stack = get_stack()
+
+        count = _safe_count(
+            stack
+        )
+
+        if tab_index < 0 or tab_index >= count:
+            return False
+
+    except RuntimeError:
+        return False
+
+    except Exception:
+        return False
+
+    tab_bar = get_tab_bar()
+
+    if tab_bar:
+
+        try:
+
+            if 0 <= tab_index < tab_bar.count():
+
+                tab_bar.setCurrentIndex(
+                    tab_index
+                )
+
+                tab_bar.repaint()
+
+        except RuntimeError:
+            pass
+
+        except Exception:
+            pass
+
+    try:
+
+        stack.setCurrentIndex(
+            tab_index
+        )
+
+    except RuntimeError:
+        return False
+
+    except Exception:
+        return False
+
+    tab_bar = get_tab_bar()
+
+    if tab_bar:
+
+        try:
+
+            if 0 <= tab_index < tab_bar.count():
+
+                tab_bar.setCurrentIndex(
+                    tab_index
+                )
+
+                tab_bar.repaint()
+
+        except RuntimeError:
+            pass
+
+        except Exception:
+            pass
+
+    return True
+
 def get_all_tab_bars():
 
     root = get_search_root_widget()
@@ -222,66 +316,354 @@ def get_all_tab_bars():
     except Exception:
         return []
 
+#---------------------------------------------------
+#debugging
+#---------------------------------------------------
+def debug_tab_bars():
+
+    stack = get_stack()
+    stack_count = get_tab_count()
+    stack_widget = _get_stack_widget_for_geometry(
+        stack
+    )
+
+    ancestors = _widget_ancestors(
+        stack_widget,
+        max_depth=10
+    )
+
+    print(
+        "NEx | Stack:",
+        stack
+    )
+
+    print(
+        "NEx | Stack count:",
+        stack_count
+    )
+
+    print(
+        "NEx | Stack current:",
+        stack.currentIndex()
+    )
+
+    for ancestor_depth, ancestor in enumerate(
+        ancestors
+    ):
+
+        try:
+
+            tab_bars = ancestor.findChildren(
+                QTabBar
+            )
+
+        except Exception:
+
+            tab_bars = []
+
+        if not tab_bars:
+            continue
+
+        print(
+            "NEx | Ancestor depth:",
+            ancestor_depth,
+            "|",
+            ancestor
+        )
+
+        for index, tab_bar in enumerate(
+            tab_bars
+        ):
+
+            try:
+
+                count = tab_bar.count()
+
+            except Exception:
+
+                count = "?"
+
+            try:
+
+                current = tab_bar.currentIndex()
+
+            except Exception:
+
+                current = "?"
+
+            texts = _tab_bar_texts(
+                tab_bar
+            )
+
+            try:
+
+                visible = tab_bar.isVisible()
+
+            except Exception:
+
+                visible = "?"
+
+            try:
+
+                score = _score_tab_bar_candidate(
+                    tab_bar,
+                    stack,
+                    ancestor_depth
+                )
+
+            except Exception:
+
+                score = "?"
+
+            print(
+                "NEx |   TabBar {} | count={} | current={} | visible={} | score={} | texts={}".format(
+                    index,
+                    count,
+                    current,
+                    visible,
+                    score,
+                    texts
+                )
+            )
+
+    chosen = get_tab_bar()
+
+    print(
+        "NEx | Chosen tab bar:",
+        chosen
+    )
+
+    if chosen:
+
+        print(
+            "NEx | Chosen texts:",
+            _tab_bar_texts(
+                chosen
+            )
+        )
+# ---------------------------------------------------------
+# Node Editor Tab Bar Detection
+# ---------------------------------------------------------
+
+def _get_stack_widget_for_geometry(
+    stack
+):
+
+    try:
+
+        if isinstance(
+            stack,
+            QStackedLayout
+        ):
+
+            return stack.parentWidget()
+
+    except Exception:
+        pass
+
+    return stack
+
+
+def _tab_bar_texts(
+    tab_bar
+):
+
+    texts = []
+
+    try:
+
+        count = tab_bar.count()
+
+    except Exception:
+
+        return texts
+
+    for index in range(
+        count
+    ):
+
+        try:
+
+            texts.append(
+                tab_bar.tabText(
+                    index
+                )
+            )
+
+        except Exception:
+
+            texts.append(
+                ""
+            )
+
+    return texts
+
+
+def _tab_bar_matches_node_editor_count(
+    tab_bar,
+    stack_count
+):
+
+    try:
+
+        tab_count = tab_bar.count()
+
+    except RuntimeError:
+        return False
+
+    except Exception:
+        return False
+
+    if tab_count == stack_count:
+        return True
+
+    # Maya Node Editor often has one extra empty tab/button entry.
+    if tab_count == stack_count + 1:
+
+        texts = _tab_bar_texts(
+            tab_bar
+        )
+
+        if texts and texts[-1] == "":
+            return True
+
+    return False
+
+
+def _tab_bar_has_false_positive_names(
+    tab_bar
+):
+
+    texts = _tab_bar_texts(
+        tab_bar
+    )
+
+    false_positive_words = [
+        "outliner",
+        "anim",
+        "modeling toolkit",
+        "channel",
+        "channel box",
+        "attribute editor",
+        "tool settings",
+        "layer editor"
+    ]
+
+    for text in texts:
+
+        lowered = text.lower()
+
+        for word in false_positive_words:
+
+            if word in lowered:
+                return True
+
+    return False
+
+
+def _score_tab_bar_candidate(
+    tab_bar,
+    stack
+):
+
+    score = 0
+
+    try:
+
+        if tab_bar.isVisible():
+            score += 100000
+
+    except Exception:
+        pass
+
+    try:
+
+        if tab_bar.currentIndex() == stack.currentIndex():
+            score += 50000
+
+    except Exception:
+        pass
+
+    texts = _tab_bar_texts(
+        tab_bar
+    )
+
+    for text in texts:
+
+        lowered = text.lower()
+
+        if "untitled" in lowered:
+            score += 50000
+
+    if _tab_bar_has_false_positive_names(
+        tab_bar
+    ):
+
+        score -= 500000
+
+    return score
+
 
 def get_tab_bar():
 
-    root = get_search_root_widget()
+    stack = get_stack()
 
     stack_count = get_tab_count()
 
+    # IMPORTANT:
+    # Search the actual Node Editor widget first.
+    # Do not start from Maya's main/root widget, because that finds
+    # Outliner / Anim / Channel Box / Modeling Toolkit tab bars.
     try:
+
+        root = get_node_editor_widget()
+
+    except Exception:
+
+        root = get_search_root_widget()
+
+    try:
+
         tab_bars = root.findChildren(
             QTabBar
         )
 
     except Exception:
+
         return None
 
-    exact_matches = []
+    candidates = []
 
     for tab_bar in tab_bars:
 
-        try:
-            count = tab_bar.count()
-
-        except RuntimeError:
+        if not _tab_bar_matches_node_editor_count(
+            tab_bar,
+            stack_count
+        ):
             continue
 
-        except Exception:
-            continue
+        score = _score_tab_bar_candidate(
+            tab_bar,
+            stack
+        )
 
-        # IMPORTANT:
-        # Only accept tab bars whose count matches the actual
-        # Node Editor stacked pages. Do NOT accept bigger tab bars,
-        # because Maya has many unrelated tab bars.
-        if count == stack_count:
-
-            exact_matches.append(
+        candidates.append(
+            (
+                score,
                 tab_bar
             )
+        )
 
-    if not exact_matches:
+    if not candidates:
         return None
 
-    # Prefer a visible tab bar if possible.
-    visible_matches = []
+    candidates = sorted(
+        candidates,
+        key=lambda data: data[0],
+        reverse=True
+    )
 
-    for tab_bar in exact_matches:
-
-        try:
-
-            if tab_bar.isVisible():
-                visible_matches.append(
-                    tab_bar
-                )
-
-        except Exception:
-            pass
-
-    if visible_matches:
-        return visible_matches[0]
-
-    return exact_matches[0]
+    return candidates[0][1]
 
 
 def get_tab_count():
@@ -295,9 +677,25 @@ def get_tab_count():
 
 def get_current_tab_index():
 
-    # IMPORTANT:
-    # The stack is the source of truth for scene/page index.
-    # The tab bar is only used for display names.
+    tab_bar = get_tab_bar()
+
+    if tab_bar:
+
+        try:
+
+            index = tab_bar.currentIndex()
+            count = tab_bar.count()
+
+            if 0 <= index < count:
+
+                return index
+
+        except RuntimeError:
+            pass
+
+        except Exception:
+            pass
+
     try:
 
         stack = get_stack()
