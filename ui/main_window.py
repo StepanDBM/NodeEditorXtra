@@ -8,7 +8,8 @@ try:
 
     from PySide2.QtCore import (
         Qt,
-        QTimer
+        QTimer,
+        QByteArray
     )
 
     from PySide2.QtWidgets import (
@@ -26,7 +27,8 @@ except ImportError:
 
     from PySide6.QtCore import (
         Qt,
-        QTimer
+        QTimer,
+        QByteArray
     )
 
     from PySide6.QtWidgets import (
@@ -60,6 +62,9 @@ def maya_main_window():
 
 class NExMainWindow(QWidget):
 
+    OPTION_WINDOW_GEOMETRY = "NEx_window_geometry"
+    OPTION_SPLITTER_SIZES = "NEx_splitter_sizes"
+
     def __init__(
         self,
         parent=None
@@ -90,6 +95,145 @@ class NExMainWindow(QWidget):
         self.build_ui()
         self.create_connections()
 
+        self.restore_ui_state()
+
+    def get_option_string(
+        self,
+        name,
+        default=""
+    ):
+
+        try:
+
+            if cmds.optionVar(
+                exists=name
+            ):
+
+                return cmds.optionVar(
+                    query=name
+                )
+
+        except Exception:
+            pass
+
+        return default
+
+
+    def set_option_string(
+        self,
+        name,
+        value
+    ):
+
+        try:
+
+            cmds.optionVar(
+                stringValue=(
+                    name,
+                    value
+                )
+            )
+
+        except Exception:
+            pass
+
+
+
+
+    def restore_ui_state(self):
+
+        try:
+
+            geometry_string = self.get_option_string(
+                self.OPTION_WINDOW_GEOMETRY,
+                ""
+            )
+
+            if geometry_string:
+
+                geometry_bytes = QByteArray.fromBase64(
+                    geometry_string.encode(
+                        "ascii"
+                    )
+                )
+
+                self.restoreGeometry(
+                    geometry_bytes
+                )
+
+        except Exception:
+            pass
+
+        try:
+
+            splitter_string = self.get_option_string(
+                self.OPTION_SPLITTER_SIZES,
+                ""
+            )
+
+            if splitter_string:
+
+                sizes = [
+                    int(
+                        value
+                    )
+                    for value in splitter_string.split(
+                        ","
+                    )
+                    if value.strip()
+                ]
+
+                if sizes:
+
+                    self.content_splitter.setSizes(
+                        sizes
+                    )
+
+        except Exception:
+            pass
+
+
+    def save_ui_state(self):
+
+        try:
+
+            geometry = self.saveGeometry()
+
+            geometry_string = bytes(
+                geometry.toBase64()
+            ).decode(
+                "ascii"
+            )
+
+            self.set_option_string(
+                self.OPTION_WINDOW_GEOMETRY,
+                geometry_string
+            )
+
+        except Exception:
+            pass
+
+        try:
+
+            sizes = self.content_splitter.sizes()
+
+            splitter_string = ",".join(
+                str(
+                    value
+                )
+                for value in sizes
+            )
+
+            self.set_option_string(
+                self.OPTION_SPLITTER_SIZES,
+                splitter_string
+            )
+
+        except Exception:
+            pass
+
+
+
     def build_ui(self):
 
         main_layout = QVBoxLayout(
@@ -110,7 +254,7 @@ class NExMainWindow(QWidget):
         )
         actions_layout = QHBoxLayout()
 
-        self.create_backdrop_btn = QPushButton("Create")
+        self.create_backdrop_btn = QPushButton("Backdrop")
         self.create_comment_btn = QPushButton("Comment")
         self.create_image_btn = QPushButton("Image")
         self.clear_all_btn = QPushButton("Clear All")
@@ -125,7 +269,7 @@ class NExMainWindow(QWidget):
         # -------------------------------------------------
         # Scene MiniMap
         # -------------------------------------------------
-        content_splitter = QSplitter(
+        self.content_splitter = QSplitter(
             Qt.Vertical
         )
 
@@ -224,25 +368,25 @@ class NExMainWindow(QWidget):
             self.focus_list
         )
 
-        content_splitter.addWidget(
+        self.content_splitter.addWidget(
             mini_container
         )
 
-        content_splitter.addWidget(
+        self.content_splitter.addWidget(
             focus_container
         )
 
-        content_splitter.setStretchFactor(
+        self.content_splitter.setStretchFactor(
             0,
             1
         )
 
-        content_splitter.setStretchFactor(
+        self.content_splitter.setStretchFactor(
             1,
             2
         )
 
-        content_splitter.setSizes(
+        self.content_splitter.setSizes(
             [
                 180,
                 320
@@ -250,7 +394,7 @@ class NExMainWindow(QWidget):
         )
 
         main_layout.addWidget(
-            content_splitter
+            self.content_splitter
         )
         # -------------------------------------------------
         # Scene persistence
@@ -351,6 +495,9 @@ class NExMainWindow(QWidget):
             self.minimap.zoom_in
         )
 
+        self.content_splitter.splitterMoved.connect(
+            self.on_splitter_moved
+        )
         
         self.create_backdrop_btn.clicked.connect(
             self._create_backdrop_from_selection_deferred
@@ -533,6 +680,7 @@ class NExMainWindow(QWidget):
         self,
         event
     ):
+        self.save_ui_state()
 
         try:
 
@@ -602,3 +750,10 @@ class NExMainWindow(QWidget):
         super().closeEvent(
             event
         )
+    def on_splitter_moved(
+            self,
+            pos,
+            index
+        ):
+
+            self.save_ui_state()

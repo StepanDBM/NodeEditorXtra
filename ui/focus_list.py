@@ -18,7 +18,9 @@ try:
         QAbstractItemView,
         QTreeWidget,
         QTreeWidgetItem,
-        QHeaderView
+        QHeaderView,
+        QLineEdit,
+        QCheckBox
     )
 
 except ImportError:
@@ -39,9 +41,11 @@ except ImportError:
         QAbstractItemView,
         QTreeWidget,
         QTreeWidgetItem,
-        QHeaderView
+        QHeaderView,
+        QLineEdit,
+        QCheckBox
     )
-
+from maya import cmds
 
 import NEx_SDBM.core.node_editor as NEx
 import NEx_SDBM.core.scene_view as scene_view
@@ -56,6 +60,10 @@ class FocusListWidget(QWidget):
     KIND_NEX_ITEM = "nex_item"
     KIND_NATIVE_NODE = "native_node"
 
+    OPTION_SHOW_NATIVE_NODES = "NEx_show_native_nodes"
+    OPTION_TREE_COLUMN_0 = "NEx_outliner_column_0"
+    OPTION_TREE_COLUMN_1 = "NEx_outliner_column_1"
+
     def __init__(
         self,
         parent=None
@@ -68,6 +76,9 @@ class FocusListWidget(QWidget):
         self._refreshing = False
         self._syncing_tabs = False
         self.current_tab_info = None
+
+        self.search_text = ""
+        self.show_native_nodes = True
 
         self.build_ui()
         self.create_connections()
@@ -101,7 +112,32 @@ class FocusListWidget(QWidget):
         layout.addWidget(
             self.tab_combo
         )
+        self.search_field = QLineEdit()
 
+        self.search_field.setPlaceholderText(
+            "Search NEx / Maya nodes..."
+        )
+
+        layout.addWidget(
+            self.search_field
+        )
+
+        self.show_native_nodes_checkbox = QCheckBox(
+            "Show Maya Nodes"
+        )
+
+        self.show_native_nodes = self.get_option_bool(
+            self.OPTION_SHOW_NATIVE_NODES,
+            True
+        )
+
+        self.show_native_nodes_checkbox.setChecked(
+            self.show_native_nodes
+        )
+
+        layout.addWidget(
+            self.show_native_nodes_checkbox
+        )
         self.tree = QTreeWidget()
 
         self.tree.setColumnCount(
@@ -142,14 +178,30 @@ class FocusListWidget(QWidget):
             | QAbstractItemView.EditKeyPressed
         )
 
+        self.tree.setExpandsOnDoubleClick(
+            False
+        )
+
         layout.addWidget(
             self.tree
         )
 
     def create_connections(self):
 
+        self.tree.header().sectionResized.connect(
+            self.on_tree_column_resized
+        )
+
         self.tab_combo.currentIndexChanged.connect(
             self.on_tab_combo_changed
+        )
+
+        self.search_field.textChanged.connect(
+            self.on_search_text_changed
+        )
+
+        self.show_native_nodes_checkbox.toggled.connect(
+            self.on_show_native_nodes_toggled
         )
 
         self.tree.itemDoubleClicked.connect(
@@ -638,6 +690,101 @@ class FocusListWidget(QWidget):
 
         return tree_item
 
+
+    def tree_item_matches_search(
+        self,
+        tree_item
+    ):
+
+        if not self.search_text:
+            return True
+
+        type_text = tree_item.text(
+            0
+        ).lower()
+
+        title_text = tree_item.text(
+            1
+        ).lower()
+
+        combined = "{} {}".format(
+            type_text,
+            title_text
+        )
+
+        return self.search_text in combined
+
+
+    def apply_filter_to_tree_item(
+        self,
+        tree_item
+    ):
+
+        own_match = self.tree_item_matches_search(
+            tree_item
+        )
+
+        child_match = False
+
+        for index in range(
+            tree_item.childCount()
+        ):
+
+            child = tree_item.child(
+                index
+            )
+
+            if self.apply_filter_to_tree_item(
+                child
+            ):
+
+                child_match = True
+
+        visible = (
+            own_match
+            or child_match
+            or not self.search_text
+        )
+
+        tree_item.setHidden(
+            not visible
+        )
+
+        if child_match and self.search_text:
+
+            tree_item.setExpanded(
+                True
+            )
+
+        return visible
+
+
+    def apply_tree_filter(self):
+
+        for index in range(
+            self.tree.topLevelItemCount()
+        ):
+
+            tree_item = self.tree.topLevelItem(
+                index
+            )
+
+            self.apply_filter_to_tree_item(
+                tree_item
+            )
+    def on_tree_column_resized(
+        self,
+        logical_index,
+        old_size,
+        new_size
+    ):
+
+        if self._refreshing:
+            return
+
+        self.save_tree_column_widths()
+
+
     # -----------------------------------------------------
     # Sorting / labels
     # -----------------------------------------------------
@@ -717,6 +864,100 @@ class FocusListWidget(QWidget):
                 item
             )
         )
+    # -----------------------------------------------------
+    # Set Options for Native Nodes
+    # -----------------------------------------------------
+
+    def get_option_bool(
+        self,
+        name,
+        default=True
+    ):
+
+        try:
+
+            if cmds.optionVar(
+                exists=name
+            ):
+
+                return bool(
+                    cmds.optionVar(
+                        query=name
+                    )
+                )
+
+        except Exception:
+            pass
+
+        return default
+
+
+    def set_option_bool(
+        self,
+        name,
+        value
+    ):
+
+        try:
+
+            cmds.optionVar(
+                intValue=(
+                    name,
+                    int(
+                        bool(
+                            value
+                        )
+                    )
+                )
+            )
+
+        except Exception:
+            pass
+
+
+    def get_option_int(
+        self,
+        name,
+        default=0
+    ):
+
+        try:
+
+            if cmds.optionVar(
+                exists=name
+            ):
+
+                return int(
+                    cmds.optionVar(
+                        query=name
+                    )
+                )
+
+        except Exception:
+            pass
+
+        return default
+
+
+    def set_option_int(
+        self,
+        name,
+        value
+    ):
+
+        try:
+
+            cmds.optionVar(
+                intValue=(
+                    name,
+                    int(
+                        value
+                    )
+                )
+            )
+
+        except Exception:
+            pass
 
     # -----------------------------------------------------
     # Styling
@@ -744,8 +985,56 @@ class FocusListWidget(QWidget):
             color.blue(),
             180
         )
+    
+    def save_tree_column_widths(self):
+
+        try:
+
+            self.set_option_int(
+                self.OPTION_TREE_COLUMN_0,
+                self.tree.columnWidth(
+                    0
+                )
+            )
+
+            self.set_option_int(
+                self.OPTION_TREE_COLUMN_1,
+                self.tree.columnWidth(
+                    1
+                )
+            )
+
+        except Exception:
+            pass
 
     def resize_tree_columns(self):
+
+        saved_column_0 = self.get_option_int(
+            self.OPTION_TREE_COLUMN_0,
+            0
+        )
+
+        saved_column_1 = self.get_option_int(
+            self.OPTION_TREE_COLUMN_1,
+            0
+        )
+
+        if (
+            saved_column_0 > 0
+            and saved_column_1 > 0
+        ):
+
+            self.tree.setColumnWidth(
+                0,
+                saved_column_0
+            )
+
+            self.tree.setColumnWidth(
+                1,
+                saved_column_1
+            )
+
+            return
 
         width = self.tree.viewport().width()
 
@@ -1081,8 +1370,8 @@ class FocusListWidget(QWidget):
                 )
 
             self.apply_initial_expansion()
-
             self.resize_tree_columns()
+            self.apply_tree_filter()
 
         finally:
 
@@ -1141,21 +1430,23 @@ class FocusListWidget(QWidget):
         # Direct native Maya nodes under this container
         # -----------------------------------------------------
 
-        native_nodes = native_nodes_by_parent.get(
-            parent_nex_item,
-            []
-        )
+        if self.show_native_nodes:
 
-        for node_name, node_item in native_nodes:
-
-            node_tree_item = self.create_native_node_tree_item(
-                node_name,
-                node_item
+            native_nodes = native_nodes_by_parent.get(
+                parent_nex_item,
+                []
             )
 
-            parent_tree_item.addChild(
-                node_tree_item
-            )
+            for node_name, node_item in native_nodes:
+
+                node_tree_item = self.create_native_node_tree_item(
+                    node_name,
+                    node_item
+                )
+
+                parent_tree_item.addChild(
+                    node_tree_item
+                )
 
     # -----------------------------------------------------
     # Tree events
@@ -1269,3 +1560,28 @@ class FocusListWidget(QWidget):
             events.emit_item_changed(
                 nex_item
             )
+    def on_search_text_changed(
+        self,
+        text
+    ):
+
+        self.search_text = text.strip().lower()
+
+        self.apply_tree_filter()
+
+
+    def on_show_native_nodes_toggled(
+        self,
+        enabled
+    ):
+
+        self.show_native_nodes = bool(
+            enabled
+        )
+
+        self.set_option_bool(
+            self.OPTION_SHOW_NATIVE_NODES,
+            self.show_native_nodes
+        )
+
+        self.refresh_tree()
