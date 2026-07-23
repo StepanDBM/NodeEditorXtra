@@ -112,7 +112,7 @@ class BackdropItem(NExGraphicsItem):
         height
     ):
 
-        self.prepareGeometryChange()
+        self.prepareGeometryChange()    
 
         self.width = max(
             100,
@@ -327,6 +327,21 @@ class BackdropItem(NExGraphicsItem):
         )
 
         return ratio >= self.capture_ratio
+
+    """
+    RULE:
+    BackdropA may capture item if:
+        item has no current parent
+    or:
+        item's current parent is BackdropA
+    or:
+        item's current parent is an ancestor of BackdropA
+
+    BackdropA may NOT capture item if:
+        item's current parent is unrelated to BackdropA
+    or:
+        item's current parent is a descendant/child of BackdropA
+    """
     def can_capture_nex_item(
         self,
         item
@@ -335,16 +350,19 @@ class BackdropItem(NExGraphicsItem):
         if item is self:
             return False
 
-        # Never let an inner/child container wrap one of its ancestors.
-        if self.item_is_ancestor_of_self(
-            item
+        # Never let this backdrop capture one of its ancestors.
+        # Example:
+        #     Child backdrop must not capture Parent backdrop.
+        if self.item_is_ancestor_of_item(
+            item,
+            self
         ):
             return False
 
-        # Never let a smaller container wrap a larger/equal container.
+        # Never let a smaller/equal container wrap a larger/equal container.
         # This blocks:
-        #     PARENT wrapping GRANDPARENT
-        # even if PARENT was resized partly outside GRANDPARENT.
+        #     child wrapping parent
+        #     sibling-sized ambiguous nesting
         if self.is_container_nex_item(
             item
         ):
@@ -364,15 +382,77 @@ class BackdropItem(NExGraphicsItem):
             item
         )
 
-        # If the item already has a parent, only that same parent
-        # is allowed to grow around it.
-        if (
-            current_parent is not None
-            and current_parent is not self
+        # Item has no parent yet.
+        # Safe to capture.
+        if current_parent is None:
+            return True
+
+        # Item is already directly owned by this container.
+        # Safe to keep/capture.
+        if current_parent is self:
+            return True
+
+        # Important rule:
+        # If item's current parent is an ancestor of this backdrop,
+        # this backdrop is allowed to become the more specific owner.
+        #
+        # Example:
+        #     Parent
+        #         ChildBackdrop
+        #         Node
+        #
+        # If ChildBackdrop grows over Node, Node can move from Parent
+        # ownership to ChildBackdrop ownership.
+        if self.item_is_ancestor_of_item(
+            current_parent,
+            self
         ):
+            return True
+
+        # Otherwise the item belongs to an unrelated container.
+        # Do not steal it.
+        return False
+
+    def can_capture_native_node_item(
+        self,
+        node_item
+    ):
+
+        try:
+
+            node_rect = node_item.sceneBoundingRect()
+
+        except RuntimeError:
             return False
 
-        return True
+        except Exception:
+            return False
+
+        owner = self.find_smallest_owner_for_rect(
+            node_rect
+        )
+
+        # Node has no owner.
+        # Safe to capture.
+        if owner is None:
+            return True
+
+        # Node is already owned by this backdrop.
+        if owner is self:
+            return True
+
+        # If the current owner is an ancestor of this backdrop,
+        # this backdrop is allowed to become the more specific owner.
+        if self.item_is_ancestor_of_item(
+            owner,
+            self
+        ):
+            return True
+
+        # Otherwise the node belongs to an unrelated container.
+        return False
+
+
     def expand_to_include_scene_rect(
         self,
         scene_rect
@@ -438,11 +518,9 @@ class BackdropItem(NExGraphicsItem):
             except Exception:
                 continue
 
-            owner = self.find_smallest_owner_for_rect(
-                node_rect
-            )
-
-            if owner is not None and owner is not self:
+            if not self.can_capture_native_node_item(
+                item
+            ):
                 continue
 
             if not self.rect_is_admissible(

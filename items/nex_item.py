@@ -786,7 +786,10 @@ class NExGraphicsItem(QGraphicsItem):
 
         candidates = sorted(
             candidates,
-            key=lambda item: item.get_area()
+            key=lambda item: (
+                item.get_area(),
+                item.zValue()
+            )
         )
 
         return candidates[0]
@@ -797,7 +800,30 @@ class NExGraphicsItem(QGraphicsItem):
         return self.get_parent_container_for_item(
             self
         )
+    def item_is_ancestor_of_item(
+        self,
+        possible_ancestor,
+        item
+    ):
 
+        parent = self.get_parent_container_for_item(
+            item
+        )
+
+        safety = 0
+
+        while parent and safety < 100:
+
+            if parent is possible_ancestor:
+                return True
+
+            parent = self.get_parent_container_for_item(
+                parent
+            )
+
+            safety += 1
+
+        return False
 
     def is_item_descendant_of(
         self,
