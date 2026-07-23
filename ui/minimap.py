@@ -138,6 +138,10 @@ class MiniMapWidget(QWidget):
         self.minimap_zoom_max = 8.0
         self.minimap_zoom_step = 1.25
 
+        self.fit_mode = "all"
+
+        self._hit_items = []
+
         # 1.0 = exact minimap position.
         # Lower values make dragging feel softer/slower.
         self.pan_drag_strength = 0.25
@@ -223,7 +227,6 @@ class MiniMapWidget(QWidget):
         )
 
         self.update()
-
     # -----------------------------------------------------
     # View binding
     # -----------------------------------------------------
@@ -363,6 +366,95 @@ class MiniMapWidget(QWidget):
     # -----------------------------------------------------
     # Scene collection
     # -----------------------------------------------------
+
+    def get_selected_scene_items(self):
+
+        if not self.scene:
+            return []
+
+        try:
+
+            selected_items = self.scene.selectedItems()
+
+        except RuntimeError:
+            return []
+
+        except Exception:
+            return []
+
+        result = []
+
+        for item in selected_items:
+
+            try:
+
+                if item.scene() is None:
+                    continue
+
+            except Exception:
+                continue
+
+            result.append(
+                item
+            )
+
+        return result
+
+
+    def get_bounds_from_scene_items(
+        self,
+        items,
+        include_viewport=False
+    ):
+
+        rects = []
+
+        for item in items:
+
+            try:
+
+                rect = item.sceneBoundingRect()
+
+            except RuntimeError:
+                continue
+
+            except Exception:
+                continue
+
+            if rect.isNull() or rect.isEmpty():
+                continue
+
+            rects.append(
+                rect
+            )
+
+        if include_viewport:
+
+            viewport_rect = self.get_viewport_scene_rect()
+
+            if viewport_rect:
+
+                rects.append(
+                    viewport_rect
+                )
+
+        if not rects:
+            return None
+
+        bounds = rects[0]
+
+        for rect in rects[1:]:
+
+            bounds = bounds.united(
+                rect
+            )
+
+        return bounds.adjusted(
+            -100,
+            -100,
+            100,
+            100
+        )
 
     def get_scene_items(self):
 
@@ -551,55 +643,38 @@ class MiniMapWidget(QWidget):
 
     def compute_scene_bounds(self):
 
-        rects = []
+        if self.fit_mode == "nex":
 
-        for item in (
+            return self.get_bounds_from_scene_items(
+                self.get_nex_items(),
+                include_viewport=True
+            )
+
+        if self.fit_mode == "selection":
+
+            selected_items = self.get_selected_scene_items()
+
+            if selected_items:
+
+                return self.get_bounds_from_scene_items(
+                    selected_items,
+                    include_viewport=True
+                )
+
+            # Fallback if nothing selected.
+            return self.get_bounds_from_scene_items(
+                self.get_native_node_items()
+                + self.get_nex_items(),
+                include_viewport=True
+            )
+
+        # Default: all.
+        return self.get_bounds_from_scene_items(
             self.get_native_node_items()
-            + self.get_nex_items()
-        ):
-
-            try:
-
-                rect = item.sceneBoundingRect()
-
-            except RuntimeError:
-                continue
-
-            except Exception:
-                continue
-
-            if rect.isNull() or rect.isEmpty():
-                continue
-
-            rects.append(
-                rect
-            )
-
-        viewport_rect = self.get_viewport_scene_rect()
-
-        if viewport_rect:
-
-            rects.append(
-                viewport_rect
-            )
-
-        if not rects:
-            return None
-
-        bounds = rects[0]
-
-        for rect in rects[1:]:
-
-            bounds = bounds.united(
-                rect
-            )
-
-        return bounds.adjusted(
-            -100,
-            -100,
-            100,
-            100
+            + self.get_nex_items(),
+            include_viewport=True
         )
+
 
     def get_viewport_scene_rect(self):
 
@@ -790,6 +865,38 @@ class MiniMapWidget(QWidget):
     # -----------------------------------------------------
     # Extra Minimap Zoom
     # -----------------------------------------------------
+
+    def set_fit_mode(
+        self,
+        fit_mode
+    ):
+
+        self.fit_mode = fit_mode
+
+        self.minimap_zoom = 1.0
+
+        self.schedule_refresh()
+
+
+    def fit_all(self):
+
+        self.set_fit_mode(
+            "all"
+        )
+
+
+    def fit_nex(self):
+
+        self.set_fit_mode(
+            "nex"
+        )
+
+
+    def fit_selection(self):
+
+        self.set_fit_mode(
+            "selection"
+        )
 
     def get_minimap_zoom_center(
         self,
@@ -1050,6 +1157,13 @@ class MiniMapWidget(QWidget):
                 scene_rect
             )
 
+            self._hit_items.append(
+                (
+                    map_rect,
+                    item
+                )
+            )
+
             painter.drawRoundedRect(
                 map_rect,
                 2,
@@ -1073,6 +1187,13 @@ class MiniMapWidget(QWidget):
             scene_rect
         )
 
+        self._hit_items.append(
+            (
+                map_rect,
+                item
+            )
+        )
+
         color = self.get_nex_color(
             item
         )
@@ -1094,7 +1215,6 @@ class MiniMapWidget(QWidget):
                 1
             )
         )
-
         painter.drawRoundedRect(
             map_rect,
             2,
@@ -1166,9 +1286,9 @@ class MiniMapWidget(QWidget):
         event
     ):
 
-        painter = QPainter(
-            self
-        )
+        painter = QPainter(self)
+
+        self._hit_items = []
 
         self.paint_background(
             painter
@@ -1265,6 +1385,50 @@ class MiniMapWidget(QWidget):
             return
 
         self.schedule_refresh()
+
+    def mouseDoubleClickEvent(
+        self,
+        event
+    ):
+
+        if event.button() != Qt.LeftButton:
+
+            event.accept()
+            return
+
+        click_pos = QPointF(
+            event.pos()
+        )
+
+        # Reverse because later-painted items are visually on top.
+        for map_rect, scene_item in reversed(
+            self._hit_items
+        ):
+
+            try:
+
+                if not map_rect.contains(
+                    click_pos
+                ):
+                    continue
+
+            except Exception:
+                continue
+
+            try:
+
+                scene_view.frame_view_on_item(
+                    scene_item
+                )
+
+            except Exception:
+                pass
+
+            event.accept()
+            return
+
+        event.accept()
+
 
     def mousePressEvent(
         self,

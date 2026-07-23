@@ -6,7 +6,8 @@ try:
     from PySide2.QtCore import (
         QObject,
         QEvent,
-        Qt
+        Qt,
+        QTimer
     )
 
     from PySide2.QtWidgets import (
@@ -17,7 +18,8 @@ except ImportError:
     from PySide6.QtCore import (
         QObject,
         QEvent,
-        Qt
+        Qt,
+        QTimer
     )
 
     from PySide6.QtWidgets import (
@@ -167,6 +169,25 @@ def frame_view_on_item(
 
     except Exception:
         return False
+    try:
+
+        import NEx_SDBM.core.utilities.events as events
+
+        events.emit_items_changed()
+
+        QTimer.singleShot(
+            50,
+            events.emit_items_changed
+        )
+
+        QTimer.singleShot(
+            150,
+            events.emit_items_changed
+        )
+
+    except Exception:
+        pass
+
 
     return True
 

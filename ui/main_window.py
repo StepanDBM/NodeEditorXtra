@@ -285,60 +285,40 @@ class NExMainWindow(QWidget):
             0
         )
 
-        mini_layout.setSpacing(
-            4
-        )
+        mini_layout.setSpacing(4)
 
         mini_header_layout = QHBoxLayout()
 
-        mini_label = QLabel(
-            "NEx - Mini Map"
-        )
+        mini_label = QLabel("NEx - Mini Map")
 
-        self.minimap_zoom_out_btn = QPushButton(
-            "-"
-        )
+        self.minimap_zoom_out_btn = QPushButton("-")
+        self.minimap_zoom_reset_btn = QPushButton("1:1")
+        self.minimap_zoom_in_btn = QPushButton("+")
 
-        self.minimap_zoom_reset_btn = QPushButton(
-            "1:1"
-        )
+        self.minimap_fit_all_btn = QPushButton("All")
+        self.minimap_fit_nex_btn = QPushButton("NEx")
+        self.minimap_fit_selection_btn = QPushButton("Sel")
 
-        self.minimap_zoom_in_btn = QPushButton(
-            "+"
-        )
-
-        mini_header_layout.addWidget(
-            mini_label
-        )
-
+        mini_header_layout.addWidget(mini_label)
         mini_header_layout.addStretch()
 
-        mini_header_layout.addWidget(
-            self.minimap_zoom_out_btn
-        )
+        mini_header_layout.addWidget(self.minimap_zoom_out_btn)
+        mini_header_layout.addWidget(self.minimap_zoom_reset_btn)
+        mini_header_layout.addWidget(self.minimap_zoom_in_btn)
 
-        mini_header_layout.addWidget(
-            self.minimap_zoom_reset_btn
-        )
+        mini_header_layout.addWidget(self.minimap_fit_all_btn)
+        mini_header_layout.addWidget(self.minimap_fit_nex_btn)
+        mini_header_layout.addWidget(self.minimap_fit_selection_btn)
+        
 
-        mini_header_layout.addWidget(
-            self.minimap_zoom_in_btn
-        )
-
-        mini_layout.addLayout(
-            mini_header_layout
-        )
+        mini_layout.addLayout(mini_header_layout)
 
         self.minimap = MiniMapWidget()
 
-        mini_layout.addWidget(
-            self.minimap
-        )
+        mini_layout.addWidget(self.minimap)
 
         focus_container = QWidget()
-        focus_layout = QVBoxLayout(
-            focus_container
-        )
+        focus_layout = QVBoxLayout(focus_container)
 
         focus_layout.setContentsMargins(
             0,
@@ -483,54 +463,29 @@ class NExMainWindow(QWidget):
         )
 
     def create_connections(self):
-        self.minimap_zoom_out_btn.clicked.connect(
-            self.minimap.zoom_out
-        )
+        self.minimap_zoom_out_btn.clicked.connect(self.minimap.zoom_out)
+        self.minimap_zoom_reset_btn.clicked.connect(self.minimap.reset_zoom)
+        self.minimap_zoom_in_btn.clicked.connect(self.minimap.zoom_in)
+        self.minimap_fit_all_btn.clicked.connect(self.minimap.fit_all)
+        self.minimap_fit_nex_btn.clicked.connect(self.minimap.fit_nex)
+        self.minimap_fit_selection_btn.clicked.connect(self.minimap.fit_selection)
 
-        self.minimap_zoom_reset_btn.clicked.connect(
-            self.minimap.reset_zoom
-        )
-
-        self.minimap_zoom_in_btn.clicked.connect(
-            self.minimap.zoom_in
-        )
-
-        self.content_splitter.splitterMoved.connect(
-            self.on_splitter_moved
-        )
+        self.content_splitter.splitterMoved.connect(self.on_splitter_moved)
         
-        self.create_backdrop_btn.clicked.connect(
-            self._create_backdrop_from_selection_deferred
-        )
-        self.create_comment_btn.clicked.connect(
-            self.create_comment
-        )
-        self.create_image_btn.clicked.connect(
-            self.create_image
-        )
-        self.clear_all_btn.clicked.connect(
-            self.clear_all_backdrops
-        )
+        self.create_backdrop_btn.clicked.connect(self._create_backdrop_from_selection_deferred)
+        self.create_comment_btn.clicked.connect(self.create_comment)
+        self.create_image_btn.clicked.connect(self.create_image)
+        self.clear_all_btn.clicked.connect(self.clear_all_backdrops)
 
-        self.save_scene_btn.clicked.connect(
-            self.save_to_scene
-        )
+        self.save_scene_btn.clicked.connect(self.save_to_scene)
 
-        self.load_scene_btn.clicked.connect(
-            self.load_from_scene
-        )
+        self.load_scene_btn.clicked.connect(self.load_from_scene)
 
-        self.save_btn.clicked.connect(
-            self.save_all
-        )
+        self.save_btn.clicked.connect(self.save_all)
 
-        self.load_btn.clicked.connect(
-            self.load_all
-        )
+        self.load_btn.clicked.connect(self.load_all)
 
-        self.reload_btn.clicked.connect(
-            self.reload_modules
-        )
+        self.reload_btn.clicked.connect(self.reload_modules)
 
     def ensure_node_editor_open(self):
 
