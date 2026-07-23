@@ -91,46 +91,377 @@ def create_backdrop(title="First Prototype"):
     return backdrop
 """
 
-def create_backdrop_from_selection(title="New Group"):
+def _get_scene_bounds_from_items(
+    items
+):
 
-    node_bounds = NEx.get_selection_bounds()
+    valid_rects = []
+
+    for item in items:
+
+        try:
+
+            rect = item.sceneBoundingRect()
+
+        except RuntimeError:
+            continue
+
+        except Exception:
+            continue
+
+        if rect.isNull() or rect.isEmpty():
+            continue
+
+        valid_rects.append(
+            rect
+        )
+
+    if not valid_rects:
+        return None
+
+    bounds = valid_rects[0]
+
+    for rect in valid_rects[1:]:
+
+        bounds = bounds.united(
+            rect
+        )
+
+    return bounds
+
+
+def _get_area_from_rect(
+    rect
+):
+
+    return (
+        rect.width()
+        * rect.height()
+    )
+
+
+def _item_contains_item(
+    container,
+    item
+):
+
+    try:
+
+        container_rect = container.sceneBoundingRect()
+        item_rect = item.sceneBoundingRect()
+
+    except RuntimeError:
+        return False
+
+    except Exception:
+        return False
+
+    return container_rect.contains(
+        item_rect
+    )
+
+
+def _get_existing_container_parent_for_item(
+    item
+):
+
+    try:
+
+        return item.get_parent_container()
+
+    except RuntimeError:
+        return None
+
+    except Exception:
+        return None
+
+
+def _item_has_selected_nex_ancestor(
+    item,
+    selected_nex_items
+):
+
+    parent = _get_existing_container_parent_for_item(
+        item
+    )
+
+    safety = 0
+
+    while parent and safety < 50:
+
+        if parent in selected_nex_items:
+            return True
+
+        parent = _get_existing_container_parent_for_item(
+            parent
+        )
+
+        safety += 1
+
+    return False
+
+
+def _filter_selected_nex_roots(
+    selected_nex_items
+):
+
+    result = []
+
+    for item in selected_nex_items:
+
+        if _item_has_selected_nex_ancestor(
+            item,
+            selected_nex_items
+        ):
+
+            continue
+
+        result.append(
+            item
+        )
+
+    return result
+
+
+def _native_node_is_inside_selected_nex_container(
+    node_item,
+    selected_nex_items
+):
+
+    for nex_item in selected_nex_items:
+
+        if not getattr(
+            nex_item,
+            "nex_container",
+            False
+        ):
+            continue
+
+        if _item_contains_item(
+            nex_item,
+            node_item
+        ):
+
+            return True
+
+    return False
+
+
+def _get_parent_container_if_backdrop_would_duplicate_parent(
+    selected_nex_items,
+    target_bounds,
+    tolerance=4.0
+):
+
+    if not selected_nex_items or not target_bounds:
+        return None
+
+    candidate_parents = []
+
+    for item in selected_nex_items:
+
+        parent = _get_existing_container_parent_for_item(
+            item
+        )
+
+        if not parent:
+            continue
+
+        try:
+
+            parent_rect = parent.sceneBoundingRect()
+
+        except RuntimeError:
+            continue
+
+        except Exception:
+            continue
+
+        if not parent_rect.contains(
+            item.sceneBoundingRect()
+        ):
+            continue
+
+        target_area = _get_area_from_rect(
+            target_bounds
+        )
+
+        parent_area = _get_area_from_rect(
+            parent_rect
+        )
+
+        if parent_area <= 0:
+            continue
+
+        area_delta = abs(
+            parent_area
+            - target_area
+        )
+
+        size_is_too_close = (
+            area_delta
+            <= tolerance
+            * max(
+                parent_rect.width(),
+                parent_rect.height()
+            )
+        )
+
+        rect_is_too_close = (
+            abs(
+                parent_rect.left()
+                - target_bounds.left()
+            )
+            <= tolerance
+            and abs(
+                parent_rect.top()
+                - target_bounds.top()
+            )
+            <= tolerance
+            and abs(
+                parent_rect.width()
+                - target_bounds.width()
+            )
+            <= tolerance
+            and abs(
+                parent_rect.height()
+                - target_bounds.height()
+            )
+            <= tolerance
+        )
+
+        if size_is_too_close or rect_is_too_close:
+
+            candidate_parents.append(
+                parent
+            )
+
+    if not candidate_parents:
+        return None
+
+    candidate_parents = sorted(
+        candidate_parents,
+        key=lambda item: item.get_area()
+    )
+
+    return candidate_parents[0]
+
+
+def create_backdrop_from_selection(
+    title="New Group"
+):
+
+    scene = NEx.get_scene()
+
+    selected_node_items = (
+        NEx.get_selected_node_items()
+    )
 
     selected_nex_items = (
         NEx.get_selected_parentable_nex_items()
     )
 
-    nex_item_bounds = (
-        NEx.get_selected_parentable_nex_bounds()
+    # -----------------------------------------------------
+    # 1. Remove selected NEx children if their selected parent
+    #    is already selected.
+    # -----------------------------------------------------
+
+    selected_nex_roots = _filter_selected_nex_roots(
+        selected_nex_items
     )
 
-    padding = 40
+    # -----------------------------------------------------
+    # 2. Remove native Maya nodes already represented by
+    #    a selected NEx container.
+    # -----------------------------------------------------
 
-    if node_bounds:
+    filtered_node_items = []
 
-        bounds = node_bounds
+    for node_item in selected_node_items:
 
-        contained_nodes = (
-            NEx.get_selected_node_names()
+        if _native_node_is_inside_selected_nex_container(
+            node_item,
+            selected_nex_roots
+        ):
+
+            continue
+
+        filtered_node_items.append(
+            node_item
         )
 
-        child_nex_items = []
+    # -----------------------------------------------------
+    # 3. Build combined selection bounds.
+    # -----------------------------------------------------
 
-    elif nex_item_bounds:
+    bounds_items = (
+        filtered_node_items
+        + selected_nex_roots
+    )
 
-        bounds = nex_item_bounds
+    bounds = _get_scene_bounds_from_items(
+        bounds_items
+    )
 
-        contained_nodes = []
-
-        child_nex_items = selected_nex_items
-
-    else:
+    if not bounds:
 
         raise RuntimeError(
             "Nothing selected."
         )
 
-    width = bounds.width() + (padding * 2)
-    height = bounds.height() + (padding * 2)
+    padding = 40
+
+    target_bounds = bounds.adjusted(
+        -padding,
+        -padding,
+        padding,
+        padding
+    )
+
+    # -----------------------------------------------------
+    # 4. Safety:
+    #    If wrapping a selected NEx item would create a backdrop
+    #    basically identical to its current parent, wrap the parent
+    #    instead. This prevents same-size/overlapping container
+    #    ambiguity and hierarchy cycles.
+    # -----------------------------------------------------
+
+    duplicate_parent = (
+        _get_parent_container_if_backdrop_would_duplicate_parent(
+            selected_nex_roots,
+            target_bounds
+        )
+    )
+
+    if duplicate_parent is not None:
+
+        try:
+
+            parent_rect = duplicate_parent.sceneBoundingRect()
+
+            bounds = parent_rect
+
+            target_bounds = bounds.adjusted(
+                -padding,
+                -padding,
+                padding,
+                padding
+            )
+
+            selected_nex_roots = [
+                duplicate_parent
+            ]
+
+            filtered_node_items = []
+
+        except RuntimeError:
+            pass
+
+        except Exception:
+            pass
+
+    width = target_bounds.width()
+    height = target_bounds.height()
 
     backdrop = BackdropItem(
         title=title,
@@ -138,20 +469,33 @@ def create_backdrop_from_selection(title="New Group"):
         height=height
     )
 
-    scene = NEx.get_scene()
-
     scene.addItem(
         backdrop
     )
+
     backdrop.setPos(
-        bounds.left() - padding,
-        bounds.top() - padding
+        target_bounds.left(),
+        target_bounds.top()
     )
 
-    backdrop.update_z_hierarchy()
+    contained_nodes = []
+
+    for node_item in filtered_node_items:
+
+        node_name = NEx.get_node_name(
+            node_item
+        )
+
+        if node_name:
+
+            contained_nodes.append(
+                node_name
+            )
 
     backdrop.contained_nodes = contained_nodes
 
+    # Let geometry-based direct ownership resolve now that
+    # the selected roots and nodes are inside the new backdrop.
     backdrop.update_z_hierarchy()
 
     _NEX_ITEMS.append(
@@ -159,8 +503,8 @@ def create_backdrop_from_selection(title="New Group"):
     )
 
     notify_items_changed()
-    return backdrop
 
+    return backdrop
 
 def clear_all_NExItems():
 

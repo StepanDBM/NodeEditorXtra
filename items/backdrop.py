@@ -185,7 +185,10 @@ class BackdropItem(NExGraphicsItem):
 
         candidates = sorted(
             candidates,
-            key=lambda item: item.get_area()
+            key=lambda item: (
+                item.get_area(),
+                item.zValue()
+            )
         )
 
         return candidates[0]

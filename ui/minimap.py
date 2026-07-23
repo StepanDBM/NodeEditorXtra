@@ -1383,17 +1383,3 @@ class MiniMapWidget(QWidget):
             self.zoom_out()
 
         event.accept()
-
-    def on_node_editor_view_destroyed(self):
-        try:
-
-            self.uninstall_view_filter()
-
-        except Exception:
-            pass
-
-        self.view = None
-        self.scene = None
-        self.scene_bounds = None
-
-        self.update()
