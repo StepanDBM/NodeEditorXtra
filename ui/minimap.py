@@ -48,113 +48,98 @@ except ImportError:
 import NEx_SDBM.core.node_editor as NEx
 import NEx_SDBM.core.scene_view as scene_view
 import NEx_SDBM.core.utilities.events as events
+import NEx_SDBM.core.utilities.refresh_scheduler as refresh_scheduler
 
 
-def eventFilter(
-    self,
-    obj,
-    event
-):
+class MiniMapViewFilter(QObject):
 
-    event_type = event.type()
+    def __init__(
+        self,
+        minimap
+    ):
 
-    if event_type == QEvent.Destroy:
+        super().__init__(
+            minimap
+        )
 
-        try:
+        self.minimap = minimap
 
-            self.minimap.on_node_editor_view_destroyed()
 
-        except Exception:
-            pass
+    def eventFilter(
+        self,
+        obj,
+        event
+    ):
 
-        return False
+        event_type = event.type()
 
-    # -----------------------------------------------------
-    # Wheel on actual Maya Node Editor.
-    # This is NOT hover.
-    # It changes the Node Editor viewport, so only update
-    # the green viewport rectangle, not item geometry.
-    # -----------------------------------------------------
+        if event_type == QEvent.Destroy:
 
-    if event_type == QEvent.Wheel:
+            try:
 
-        try:
+                self.minimap.on_node_editor_view_destroyed()
 
-            self.minimap.schedule_viewport_refresh()
-
-            QTimer.singleShot(
-                16,
-                self.minimap.schedule_viewport_refresh
-            )
-
-            QTimer.singleShot(
-                50,
-                self.minimap.schedule_viewport_refresh
-            )
-
-            QTimer.singleShot(
-                100,
-                self.minimap.schedule_viewport_refresh
-            )
-
-        except Exception:
-            pass
-
-        return False
-
-    # -----------------------------------------------------
-    # Mouse move on actual Maya Node Editor.
-    # Pure hover should do nothing.
-    # Dragging with a button pressed may mean:
-    #     - native node moving
-    #     - NEx item moving
-    #     - view panning
-    # So update cached geometry only when a button is down.
-    # -----------------------------------------------------
-
-    if event_type == QEvent.MouseMove:
-
-        try:
-
-            buttons = event.buttons()
-
-        except Exception:
-
-            buttons = Qt.NoButton
-
-        if buttons == Qt.NoButton:
+            except Exception:
+                pass
 
             return False
 
-        try:
+        # -----------------------------------------------------
+        # Wheel on actual Maya Node Editor.
+        # This is NOT hover.
+        # It changes the Node Editor viewport, so only update
+        # the green viewport rectangle, not item geometry.
+        # -----------------------------------------------------
 
-            self.minimap.schedule_geometry_refresh()
+        if event_type == QEvent.Wheel:
 
-        except Exception:
-            pass
+            try:
 
-        return False
+                self.minimap.schedule_viewport_refresh()
 
-    # -----------------------------------------------------
-    # Other viewport-related events.
-    # -----------------------------------------------------
+                QTimer.singleShot(
+                    16,
+                    self.minimap.schedule_viewport_refresh
+                )
 
-    if event_type in (
-        QEvent.MouseButtonPress,
-        QEvent.MouseButtonRelease,
-        QEvent.Resize,
-        QEvent.Show,
-        QEvent.Hide
-    ):
+                QTimer.singleShot(
+                    50,
+                    self.minimap.schedule_viewport_refresh
+                )
 
-        try:
+                QTimer.singleShot(
+                    100,
+                    self.minimap.schedule_viewport_refresh
+                )
 
-            self.minimap.schedule_viewport_refresh()
+            except Exception:
+                pass
 
-        except Exception:
-            pass
+            return False
 
-        if event_type == QEvent.MouseButtonRelease:
+        # -----------------------------------------------------
+        # Mouse move on actual Maya Node Editor.
+        # Pure hover should do nothing.
+        # Dragging with a button pressed may mean:
+        #     - native node moving
+        #     - NEx item moving
+        #     - view panning
+        # So update cached geometry only when a button is down.
+        # -----------------------------------------------------
+
+        if event_type == QEvent.MouseMove:
+
+            try:
+
+                buttons = event.buttons()
+
+            except Exception:
+
+                buttons = Qt.NoButton
+
+            if buttons == Qt.NoButton:
+
+                return False
 
             try:
 
@@ -163,9 +148,39 @@ def eventFilter(
             except Exception:
                 pass
 
-        return False
+            return False
 
-    return False
+        # -----------------------------------------------------
+        # Other viewport-related events.
+        # -----------------------------------------------------
+
+        if event_type in (
+            QEvent.MouseButtonPress,
+            QEvent.MouseButtonRelease,
+            QEvent.Resize,
+            QEvent.Show,
+            QEvent.Hide
+        ):
+
+            try:
+
+                self.minimap.schedule_viewport_refresh()
+
+            except Exception:
+                pass
+
+            if event_type == QEvent.MouseButtonRelease:
+
+                try:
+
+                    self.minimap.schedule_geometry_refresh()
+
+                except Exception:
+                    pass
+
+            return False
+
+        return False
 
 
 class MiniMapWidget(QWidget):
@@ -254,6 +269,7 @@ class MiniMapWidget(QWidget):
         )
 
         self.connect_events()
+        refresh_scheduler.register_minimap(self)
         self.reconnect_view()
         self.schedule_model_refresh()
 
@@ -289,16 +305,143 @@ class MiniMapWidget(QWidget):
             scene_rect
         )
 
+    def on_items_changed_detailed(
+        self,
+        payload
+    ):
+
+        reasons = set(
+            payload.get(
+                "reasons",
+                []
+            )
+        )
+
+        if not reasons:
+
+            self.schedule_model_refresh()
+            return
+
+        model_reasons = set(
+            [
+                "model",
+                "hierarchy",
+                "create",
+                "delete",
+                "load",
+                "clear",
+                "native_map",
+                "tabs",
+                "unknown",
+            ]
+        )
+
+        geometry_reasons = set(
+            [
+                "geometry",
+                "move",
+                "resize",
+                "position",
+            ]
+        )
+
+        style_reasons = set(
+            [
+                "style",
+                "color",
+                "title",
+                "rename",
+            ]
+        )
+
+        if reasons.intersection(
+            model_reasons
+        ):
+
+            self.schedule_model_refresh()
+            return
+
+        if reasons.intersection(
+            geometry_reasons
+        ):
+
+            self.schedule_geometry_refresh()
+            return
+
+        if reasons.intersection(
+            style_reasons
+        ):
+
+            self.update()
+            return
+
+
+    def on_item_changed_detailed(
+        self,
+        item,
+        payload
+    ):
+
+        reason = payload.get(
+            "reason",
+            "unknown"
+        )
+
+        if reason in (
+            "geometry",
+            "move",
+            "resize",
+            "position"
+        ):
+
+            self.schedule_geometry_refresh()
+            return
+
+        if reason in (
+            "style",
+            "color",
+            "title",
+            "rename"
+        ):
+
+            self.update()
+            return
+
+        if reason in (
+            "create",
+            "delete",
+            "hierarchy",
+            "model",
+            "load",
+            "clear",
+            "unknown"
+        ):
+
+            self.schedule_model_refresh()
+            return
+
+
+    def on_view_changed(
+        self,
+        payload
+    ):
+
+        self.schedule_viewport_refresh()
+
     def connect_events(self):
 
         bus = events.get_event_bus()
 
-        bus.items_changed.connect(
-            self.schedule_model_refresh
+        bus.items_changed_detailed.connect(
+            self.on_items_changed_detailed
         )
 
-        bus.item_changed.connect(
-            self.schedule_model_refresh
+        bus.item_changed_detailed.connect(
+            self.on_item_changed_detailed
+        )
+
+        bus.view_changed.connect(
+            self.on_view_changed
         )
 
         bus.tabs_changed.connect(
@@ -610,6 +753,7 @@ class MiniMapWidget(QWidget):
         try:
 
             self.uninstall_view_filter()
+            refresh_scheduler.unregister_minimap(self)
 
         except Exception:
             pass

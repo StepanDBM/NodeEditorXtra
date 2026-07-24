@@ -351,7 +351,7 @@ class NExGraphicsItem(QGraphicsItem):
             scene.removeItem(
                 self
             )
-        self.notify_items_changed() #eventHandler
+        self.notify_items_changed(reason = "delete") #eventHandler
 
 
     def paint_close_button(
@@ -705,27 +705,36 @@ class NExGraphicsItem(QGraphicsItem):
     # FocusViewList Event Abstraction
     # -----------------------------------------------------
 
-    def notify_item_changed(self):
+    def notify_item_changed(
+        self,
+        reason="unknown"
+    ):
 
         try:
 
             import NEx_SDBM.core.utilities.events as events
 
             events.emit_item_changed(
-                self
+                self,
+                reason=reason
             )
 
         except Exception:
             pass
 
 
-    def notify_items_changed(self):
+    def notify_items_changed(
+        self,
+        reason="unknown"
+    ):
 
         try:
 
             import NEx_SDBM.core.utilities.events as events
 
-            events.emit_items_changed()
+            events.emit_items_changed(
+                reason=reason
+            )
 
         except Exception:
             pass
@@ -1352,7 +1361,7 @@ class NExGraphicsItem(QGraphicsItem):
         )
 
         self.update()
-        self.notify_item_changed() #eventHandler
+        self.notify_item_changed(reason = "style") #eventHandler
 
     def on_color_changed(
         self,
@@ -1421,7 +1430,7 @@ class NExGraphicsItem(QGraphicsItem):
             if new_title:
                 self.title = new_title
                 self.on_title_changed()
-        self.notify_item_changed() #eventHandler
+        self.notify_item_changed(reason = "title") #eventHandler
         scene = self.scene()
 
         try:
@@ -1550,6 +1559,12 @@ class NExGraphicsItem(QGraphicsItem):
 
             except Exception:
                 pass
+            try:
+
+                self.notify_item_changed(reason="geometry")
+
+            except Exception:
+                pass
             event.accept()
             return
 
@@ -1562,7 +1577,7 @@ class NExGraphicsItem(QGraphicsItem):
 
         self.clear_interaction_state()
         self.update_z_hierarchy()
-        self.notify_item_changed() #eventHandler
+        self.notify_item_changed(reason = "geometry") #eventHandler
 
         super().mouseReleaseEvent(
             event

@@ -13,6 +13,7 @@ MODULES_TO_RELOAD = [
     "NEx_SDBM.core.tab_observer",
     "NEx_SDBM.core.utilities.undoChunk",
     "NEx_SDBM.core.utilities.events",
+    "NEx_SDBM.core.utilities.refresh_scheduler",
 
     # Items base first
     "NEx_SDBM.items.nex_item",

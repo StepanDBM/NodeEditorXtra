@@ -4,18 +4,19 @@ NEW updates:
 Updating the system now will take some time, but will ake it usable. At this point this shit is stable and cool, but is NOT
 usable, it's SO slow it almost makes me want to switch to C for this project alone.
 I will be doing, in the future:
- - Build a central SceneIndex cache so every system stops rescanning Maya’s Node Editor scene independently.
- - Cache hierarchy ownership ONCE (not per draw in movement and mouse release) per dirty geometry pass instead of recomputing parent/child containment everywhere.
- - Split minimap refresh into model refresh and cheap viewport-only refresh.
- - Stop rebuilding the full Outliner tree unless hierarchy structure actually changed.
- - Make drag operations fully cache-based so mouse-move never scans the scene.
- - Replace recursive update_z_hierarchy() parent checks with cached depth and z values.
- - Cache native Maya node maps conservatively instead of rebuilding node-name-to-graphics-item maps repeatedly.
- - Add dirty flags for geometry, style, title, selection, view, and tabs instead of broad items_changed.
- - Add a refresh scheduler that coalesces event storms into one controlled rebuild.
- - Make minimap painting dumb by drawing precomputed cached draw data only (mainly from SceneIndex).
- - Later, make the Outliner incremental instead of clearing and recreating every row.
- - Add per-tab lazy indexing so inactive Node Editor tabs do not pay active-tab refresh costs (althoguh not sure if that really makes any diference, still have to check the ).
+ (DONE) Build a central SceneIndex cache so every system stops rescanning Maya’s Node Editor scene independently.
+  - - - This improved performance by factors of magnitudes, it went from (O)N^M to (O)N
+ (DONE) Cache hierarchy ownership ONCE (not per draw in movement and mouse release) per dirty geometry pass instead of recomputing parent/child containment everywhere.
+ (DONE) Split minimap refresh into model refresh and cheap viewport-only refresh.
+ (TODO) Stop rebuilding the full Outliner tree unless hierarchy structure actually changed.
+ (DONE) Make drag operations fully cache-based so mouse-move never scans the scene.
+ (TODO) Replace recursive update_z_hierarchy() parent checks with cached depth and z values.
+ (DONE) Cache native Maya node maps conservatively instead of rebuilding node-name-to-graphics-item maps repeatedly.
+ (TODO) Add dirty flags for geometry, style, title, selection, view, and tabs instead of broad items_changed.
+ (DONE) Add a refresh scheduler that coalesces event storms into one controlled rebuild.
+ (DONE) Make minimap painting dumb by drawing precomputed cached draw data only (mainly from SceneIndex).
+ (TODO) Later, make the Outliner incremental instead of clearing and recreating every row.
+ (TODO) Add per-tab lazy indexing so inactive Node Editor tabs do not pay active-tab refresh costs (althoguh not sure if that really makes any diference, still have to check the ).
 """
 import __main__
 

@@ -51,6 +51,7 @@ import NEx_SDBM.core.node_editor as NEx
 import NEx_SDBM.core.scene_view as scene_view
 import NEx_SDBM.core.utilities.events as events
 import NEx_SDBM.core.utilities.scene_index as scene_index
+import NEx_SDBM.core.utilities.refresh_scheduler as refresh_scheduler
 
 
 class FocusListWidget(QWidget):
@@ -87,7 +88,7 @@ class FocusListWidget(QWidget):
 
         self.build_ui()
         self.create_connections()
-
+        refresh_scheduler.register_outliner(self)
         self.refresh_tabs()
         self.refresh_tree_now()
 
@@ -222,12 +223,12 @@ class FocusListWidget(QWidget):
 
         bus = events.get_event_bus()
 
-        bus.items_changed.connect(
-            self.schedule_tree_refresh
+        bus.items_changed_detailed.connect(
+            self.on_bus_items_changed_detailed
         )
 
-        bus.item_changed.connect(
-            self.on_bus_item_changed
+        bus.item_changed_detailed.connect(
+            self.on_bus_item_changed_detailed
         )
 
         bus.tabs_changed.connect(
@@ -1617,6 +1618,151 @@ class FocusListWidget(QWidget):
         )
 
         self.schedule_tree_refresh()
+
+    def on_bus_items_changed_detailed(
+        self,
+        payload
+    ):
+
+        reasons = set(
+            payload.get(
+                "reasons",
+                []
+            )
+        )
+
+        if not reasons:
+
+            self.schedule_tree_refresh()
+            return
+
+        structural_reasons = set(
+            [
+                "model",
+                "hierarchy",
+                "create",
+                "delete",
+                "load",
+                "clear",
+                "native_map",
+                "tabs",
+                "unknown",
+            ]
+        )
+
+        geometry_reasons = set(
+            [
+                "geometry",
+                "move",
+                "resize",
+                "position",
+            ]
+        )
+
+        # Geometry may change hierarchy, but we coalesce it.
+        if reasons.intersection(
+            structural_reasons
+        ):
+
+            self.schedule_tree_refresh()
+            return
+
+        if reasons.intersection(
+            geometry_reasons
+        ):
+
+            self.schedule_tree_refresh()
+            return
+
+        # title/style are handled by item-specific signal.
+        self.schedule_filter_refresh()
+
+    def update_tree_item_for_scene_item(
+        self,
+        scene_item
+    ):
+
+        tree_item = self._tree_items_by_scene_item.get(
+            scene_item
+        )
+
+        if not tree_item:
+
+            self.schedule_tree_refresh()
+            return
+
+        kind = tree_item.data(
+            0,
+            self.KIND_ROLE
+        )
+
+        if kind != self.KIND_NEX_ITEM:
+            return
+
+        try:
+
+            tree_item.setText(
+                0,
+                self.get_item_type_label(
+                    scene_item
+                )
+            )
+
+            tree_item.setText(
+                1,
+                self.get_item_title(
+                    scene_item
+                )
+            )
+
+            self.apply_row_style(
+                tree_item,
+                scene_item
+            )
+
+        except Exception:
+            pass
+    def on_bus_item_changed_detailed(
+        self,
+        item,
+        payload
+    ):
+
+        reason = payload.get(
+            "reason",
+            "unknown"
+        )
+
+        if reason in (
+            "title",
+            "rename",
+            "style",
+            "color"
+        ):
+
+            self.update_tree_item_for_scene_item(
+                item
+            )
+
+            self.schedule_filter_refresh()
+            return
+
+        if reason in (
+            "geometry",
+            "move",
+            "resize",
+            "position",
+            "hierarchy",
+            "create",
+            "delete",
+            "model",
+            "unknown"
+        ):
+
+            self.schedule_tree_refresh()
+            return
+
+
     def on_bus_item_changed(
         self,
         item

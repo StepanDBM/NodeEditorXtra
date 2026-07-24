@@ -31,65 +31,16 @@ def clear_nex_selection():
 # FocusViewList Event Abstraction
 # -----------------------------------------------------
 
-def notify_items_changed():
+def notify_items_changed(reason ="unknown"):
 
     try:
-        events.emit_items_changed()
+        events.emit_items_changed( reason = reason)
 
     except Exception:
         pass
 # ---------------------------------------------------------
 # BackDropSpecific Actions
 # ---------------------------------------------------------
-
-def delete_selected_backdrops():
-
-    scene = NEx.get_scene()
-
-    selected = scene.selectedItems()
-
-    deleted_count = 0
-
-    for item in list(selected):
-
-        if not serializer.is_nex_item_like(item):
-            continue
-
-        try:
-            scene.removeItem(item)
-
-            try:
-                _NEX_ITEMS.remove(item)
-
-            except ValueError:
-                pass
-
-            deleted_count += 1
-
-        except RuntimeError:
-            deleted_count += 1
-
-        except Exception:
-            pass
-    notify_items_changed()
-    print(
-        "NEx | Deleted {} item(s)".format(
-            deleted_count
-        )
-    )
-
-"""
-def create_backdrop(title="First Prototype"):
-    #with unDo("NEx Create Backdrop"):
-    scene = NEx.get_scene()
-    backdrop = BackdropItem(title)
-    scene.addItem(backdrop)
-    backdrop.setPos(0, 0)
-
-    _NEX_ITEMS.append(backdrop)
-
-    return backdrop
-"""
 
 def _get_scene_bounds_from_items(
     items
@@ -502,7 +453,7 @@ def create_backdrop_from_selection(
         backdrop
     )
 
-    notify_items_changed()
+    notify_items_changed(reason ="create")
 
     return backdrop
 
@@ -515,7 +466,7 @@ def clear_all_NExItems():
         if item not in removed
     ]
 
-    notify_items_changed()
+    notify_items_changed(reason ="clear")
     print(
         "NEx | Cleared {} item(s)".format(
             len(removed)
@@ -571,7 +522,7 @@ def create_comment(
     _NEX_ITEMS.append(
         comment
     )
-    notify_items_changed()
+    notify_items_changed(reason ="create")
     return comment
 
 
@@ -697,7 +648,7 @@ def load_all(
     _NEX_ITEMS.extend(
         created
     )
-    notify_items_changed()
+    notify_items_changed(reason ="load")
     return created
 
 
@@ -727,7 +678,7 @@ def load_all_dialog():
 
     if not result:
         return None
-    notify_items_changed()
+    notify_items_changed(reason ="load")
     return load_all(
         result[0],
         clear_existing=True
@@ -848,7 +799,7 @@ def create_image(
     _NEX_ITEMS.append(
         image
     )
-    notify_items_changed()
+    notify_items_changed(reason ="create")
     return image
 
 # ---------------------------------------------------------
