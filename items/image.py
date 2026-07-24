@@ -33,7 +33,6 @@ from NEx_SDBM.items.nex_item import (
 
 
 class ImageItem(NExGraphicsItem):
-
     def __init__(
         self,
         title="Image",
@@ -91,32 +90,24 @@ class ImageItem(NExGraphicsItem):
     # -----------------------------------------------------
 
     def load_pixmap(self):
-
         self.pixmap = QPixmap()
 
         if not self.image_path:
             return
-
-        if not os.path.exists(
-            self.image_path
-        ):
+        if not os.path.exists(self.image_path):
             return
 
-        self.pixmap.load(
-            self.image_path
-        )
+        self.pixmap.load(self.image_path)
 
     def set_image_path(
         self,
         image_path
     ):
-
         self.image_path = image_path
         self.load_pixmap()
         self.update()
 
     def get_image_rect(self):
-
         body_rect = self.get_body_rect()
 
         return QRectF(
@@ -134,11 +125,9 @@ class ImageItem(NExGraphicsItem):
         self,
         event
     ):
-
         self.pick_image_file()
 
     def pick_image_file(self):
-
         try:
             from maya import cmds
 
@@ -158,7 +147,6 @@ class ImageItem(NExGraphicsItem):
             )
 
         except Exception as error:
-
             print(
                 "NEx | Could not pick image:",
                 error
@@ -168,7 +156,6 @@ class ImageItem(NExGraphicsItem):
         self,
         event
     ):
-
         try:
             from PySide2.QtWidgets import QMenu
 
@@ -177,32 +164,19 @@ class ImageItem(NExGraphicsItem):
 
         menu = QMenu()
 
-        replace_action = menu.addAction(
-            "Replace Image"
-        )
+        replace_action = menu.addAction("Replace Image")
+        color_action = menu.addAction("Color")
+        delete_action = menu.addAction("Delete")
 
-        color_action = menu.addAction(
-            "Color"
-        )
-
-        delete_action = menu.addAction(
-            "Delete"
-        )
-
-        result = menu.exec_(
-            event.screenPos()
-        )
+        result = menu.exec_(event.screenPos())
 
         if result == replace_action:
-
             self.pick_image_file()
 
         elif result == color_action:
-
             self.pick_color()
 
         elif result == delete_action:
-
             self.delete_self()
 
     # -----------------------------------------------------
@@ -214,7 +188,6 @@ class ImageItem(NExGraphicsItem):
         painter,
         image_rect
     ):
-
         painter.setPen(
             QColor(
                 255,
@@ -234,11 +207,8 @@ class ImageItem(NExGraphicsItem):
         self,
         painter
     ):
-
         image_rect = self.get_image_rect()
-
         if self.pixmap.isNull():
-
             self.paint_missing_image(
                 painter,
                 image_rect
@@ -302,18 +272,10 @@ class ImageItem(NExGraphicsItem):
         widget
     ):
 
-        self.paint_base_panel(
-            painter
-        )
-
+        self.paint_base_panel(painter)
         painter.save()
+        painter.setClipRect(self.get_body_rect())
 
-        painter.setClipRect(
-            self.get_body_rect()
-        )
-
-        self.paint_image(
-            painter
-        )
+        self.paint_image(painter)
 
         painter.restore()

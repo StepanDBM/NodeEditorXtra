@@ -42,7 +42,6 @@ import NEx_SDBM.core.utilities.scene_index as scene_index
 
 
 class BackdropItem(NExGraphicsItem):
-
     def __init__(
         self,
         title="Backdrop",
@@ -112,7 +111,6 @@ class BackdropItem(NExGraphicsItem):
         width,
         height
     ):
-
         self.prepareGeometryChange()    
 
         self.width = max(
@@ -126,11 +124,9 @@ class BackdropItem(NExGraphicsItem):
         )
 
         self.on_size_changed()
-
         self.update()
 
     def get_header_rect(self):
-
         return QRectF(
             0,
             0,
@@ -142,7 +138,6 @@ class BackdropItem(NExGraphicsItem):
         self,
         pos
     ):
-
         if self.get_close_rect().contains(
             pos
         ):
@@ -160,33 +155,19 @@ class BackdropItem(NExGraphicsItem):
         self,
         scene_rect
     ):
-
         try:
-
-            index = scene_index.get_scene_index(
-                scene=self.scene()
-            )
+            index = scene_index.get_scene_index(scene=self.scene())
 
             candidates = []
-
             for container in index.get_container_items():
-
-                rect = index.get_rect(
-                    container
-                )
+                rect = index.get_rect(container)
 
                 if not rect:
                     continue
 
                 try:
-
-                    if rect.contains(
-                        scene_rect
-                    ):
-
-                        candidates.append(
-                            container
-                        )
+                    if rect.contains(scene_rect):
+                        candidates.append(container)
 
                 except Exception:
                     continue
@@ -209,23 +190,14 @@ class BackdropItem(NExGraphicsItem):
             return None
 
     def get_direct_node_names(self):
-
         try:
-
-            index = scene_index.get_scene_index(
-                scene=self.scene()
-            )
-
-            return index.get_native_node_name_list_for_parent(
-                self
-            )
+            index = scene_index.get_scene_index(scene=self.scene())
+            return index.get_native_node_name_list_for_parent(self)
 
         except Exception:
-
             return []
 
     def update_contained_nodes(self):
-
         self.update_direct_contents()
 
     # -----------------------------------------------------
@@ -233,35 +205,20 @@ class BackdropItem(NExGraphicsItem):
     # -----------------------------------------------------
 
     def get_hover_header_color(self):
-
-        color = self.clone_color(
-            self.header_color
-        )
-
-        return color.lighter(
-            self.hover_lighter_factor
-        )
+        color = self.clone_color(self.header_color)
+        return color.lighter(self.hover_lighter_factor)
 
 
     def get_pressed_header_color(self):
-
-        color = self.clone_color(
-            self.header_color
-        )
-
-        return color.lighter(
-            150
-        )
+        color = self.clone_color(self.header_color)
+        return color.lighter(150)
 
 
     def get_paint_header_color(self):
-
         if self._pressed:
-
             return self.get_pressed_header_color()
 
         if self._hovered:
-
             return self.get_hover_header_color()
 
         return self.header_color
@@ -274,12 +231,8 @@ class BackdropItem(NExGraphicsItem):
         self,
         item
     ):
-
         try:
-
-            index = scene_index.get_scene_index(
-                scene=self.scene()
-            )
+            index = scene_index.get_scene_index(scene=self.scene())
 
             return index.is_ancestor(
                 item,
@@ -287,24 +240,18 @@ class BackdropItem(NExGraphicsItem):
             )
 
         except Exception:
-
             return False
 
     def rect_is_admissible(
         self,
         candidate_rect
     ):
-
         my_rect = self.sceneBoundingRect()
 
-        if my_rect.contains(
-            candidate_rect
-        ):
+        if my_rect.contains(candidate_rect):
             return False
 
-        intersection = my_rect.intersected(
-            candidate_rect
-        )
+        intersection = my_rect.intersected(candidate_rect)
 
         if intersection.isEmpty():
             return False
@@ -347,40 +294,28 @@ class BackdropItem(NExGraphicsItem):
         self,
         item
     ):
-
         try:
-
-            index = scene_index.get_scene_index(
-                scene=self.scene()
-            )
+            index = scene_index.get_scene_index(scene=self.scene())
 
             return index.can_container_capture_nex_item(
                 self,
                 item
             )
-
         except Exception:
-
             return False
 
     def can_capture_native_node_item(
         self,
         node_item
     ):
-
         try:
-
-            index = scene_index.get_scene_index(
-                scene=self.scene()
-            )
-
+            index = scene_index.get_scene_index(scene=self.scene())
             return index.can_container_capture_native_node(
                 self,
                 node_item
             )
 
         except Exception:
-
             return False
 
 
@@ -388,7 +323,6 @@ class BackdropItem(NExGraphicsItem):
         self,
         scene_rect
     ):
-
         my_rect = self.sceneBoundingRect()
 
         padded_rect = scene_rect.adjusted(
@@ -398,9 +332,7 @@ class BackdropItem(NExGraphicsItem):
             self.node_capture_padding
         )
 
-        target_rect = my_rect.united(
-            padded_rect
-        )
+        target_rect = my_rect.united(padded_rect)
 
         if target_rect == my_rect:
             return False
@@ -428,9 +360,7 @@ class BackdropItem(NExGraphicsItem):
         return True
     
     def auto_expand_to_capture_nearby_items(self):
-
         try:
-
             scene_index.rebuild_scene_index(
                 scene=self.scene()
             )
@@ -446,9 +376,7 @@ class BackdropItem(NExGraphicsItem):
         scene_map = NEx.get_scene_node_map()
 
         for node_name, item in scene_map.items():
-
             try:
-
                 node_rect = item.sceneBoundingRect()
 
             except RuntimeError:
@@ -457,19 +385,13 @@ class BackdropItem(NExGraphicsItem):
             except Exception:
                 continue
 
-            if not self.can_capture_native_node_item(
-                item
-            ):
+            if not self.can_capture_native_node_item(item):
                 continue
 
-            if not self.rect_is_admissible(
-                node_rect
-            ):
+            if not self.rect_is_admissible(node_rect):
                 continue
 
-            if self.expand_to_include_scene_rect(
-                node_rect
-            ):
+            if self.expand_to_include_scene_rect(node_rect):
 
                 changed = True
 
@@ -479,9 +401,7 @@ class BackdropItem(NExGraphicsItem):
 
         for item in self.get_scene_parentable_items():
 
-            if not self.can_capture_nex_item(
-                item
-            ):
+            if not self.can_capture_nex_item(item):
                 continue
 
             try:
@@ -494,20 +414,15 @@ class BackdropItem(NExGraphicsItem):
             except Exception:
                 continue
 
-            if not self.rect_is_admissible(
-                item_rect
-            ):
+            if not self.rect_is_admissible(item_rect):
                 continue
 
-            if self.expand_to_include_scene_rect(
-                item_rect
-            ):
+            if self.expand_to_include_scene_rect(item_rect):
 
                 changed = True
+
         if changed:
-
             try:
-
                 scene_index.mark_scene_index_dirty()
 
             except Exception:
@@ -523,7 +438,6 @@ class BackdropItem(NExGraphicsItem):
         self,
         event
     ):
-
         try:
             from PySide2.QtWidgets import QMenu
 
@@ -532,13 +446,8 @@ class BackdropItem(NExGraphicsItem):
 
         menu = QMenu()
 
-        delete_action = menu.addAction(
-            "Delete"
-        )
-
-        result = menu.exec_(
-            event.screenPos()
-        )
+        delete_action = menu.addAction("Delete")
+        result = menu.exec_(event.screenPos())
 
         if result == delete_action:
             self.delete_self()
@@ -551,7 +460,6 @@ class BackdropItem(NExGraphicsItem):
         self,
         event
     ):
-
         self._x_pressed = (
             self.get_close_rect().contains(
                 event.pos()
@@ -559,16 +467,13 @@ class BackdropItem(NExGraphicsItem):
         )
 
         if self._x_pressed:
-
             self._pressed = True
             self.update()
 
             event.accept()
             return
 
-        super().mousePressEvent(
-            event
-        )
+        super().mousePressEvent(event)
 
     def mouseReleaseEvent(
         self,
@@ -576,15 +481,11 @@ class BackdropItem(NExGraphicsItem):
     ):
         was_resizing = self._resizing
 
-        super().mouseReleaseEvent(
-            event
-        )
+        super().mouseReleaseEvent(event)
         self.update_z_hierarchy()
 
         if was_resizing:
-
             try:
-
                 scene_index.mark_scene_index_dirty()
 
             except Exception:
@@ -599,7 +500,6 @@ class BackdropItem(NExGraphicsItem):
         self,
         event
     ):
-
         self.pick_color()
 
     # -----------------------------------------------------
@@ -613,25 +513,13 @@ class BackdropItem(NExGraphicsItem):
         widget
     ):
 
-        painter.setRenderHint(
-            QPainter.Antialiasing
-        )
+        painter.setRenderHint(QPainter.Antialiasing)
 
-        background_color = (
-            self.get_paint_background_color()
-        )
+        background_color = (self.get_paint_background_color())
 
-        header_color = (
-            self.get_paint_header_color()
-        )
-
-        border_color = (
-            self.get_paint_border_color()
-        )
-
-        border_width = (
-            self.get_paint_border_width()
-        )
+        header_color = (self.get_paint_header_color())
+        border_color = (self.get_paint_border_color())
+        border_width = (self.get_paint_border_width())
 
         painter.setBrush(
             QBrush(
@@ -659,9 +547,7 @@ class BackdropItem(NExGraphicsItem):
             self.header_height
         )
 
-        painter.setBrush(
-            header_color
-        )
+        painter.setBrush(header_color)
 
         painter.drawRoundedRect(
             header_rect,
@@ -669,13 +555,8 @@ class BackdropItem(NExGraphicsItem):
             self.roundness
         )
 
-        self.paint_title(
-            painter
-        )
-
-        self.paint_close_button(
-            painter
-        )
+        self.paint_title(painter)
+        self.paint_close_button(painter)
 
         painter.setPen(
             QColor(

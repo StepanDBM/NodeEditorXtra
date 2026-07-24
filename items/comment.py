@@ -41,7 +41,6 @@ from NEx_SDBM.items.nex_item import NExGraphicsItem
 
 
 class CommentTextEditor(QGraphicsTextItem):
-
     def __init__(
         self,
         comment
@@ -52,9 +51,7 @@ class CommentTextEditor(QGraphicsTextItem):
 
         self.comment = comment
 
-        self.setPlainText(
-            comment.text
-        )
+        self.setPlainText(comment.text)
 
         self.setTextInteractionFlags(
             Qt.TextEditorInteraction
@@ -68,9 +65,7 @@ class CommentTextEditor(QGraphicsTextItem):
             )
         )
 
-        self.setZValue(
-            999
-        )
+        self.setZValue(999)
 
         text_rect = comment.get_text_rect()
 
@@ -85,22 +80,14 @@ class CommentTextEditor(QGraphicsTextItem):
                 text_rect.width()
             )
         )
-        self.document().setDefaultTextOption(
-            comment.get_text_option()
-        )
+        self.document().setDefaultTextOption(comment.get_text_option())
 
     def focusOutEvent(
         self,
         event
     ):
-
-        super().focusOutEvent(
-            event
-        )
-
-        self.comment.finish_text_edit(
-            commit=True
-        )
+        super().focusOutEvent(event)
+        self.comment.finish_text_edit(commit=True)
 
     def keyPressEvent(
         self,
@@ -109,46 +96,37 @@ class CommentTextEditor(QGraphicsTextItem):
 
         if event.key() == Qt.Key_Escape:
 
-            self.comment.finish_text_edit(
-                commit=False
-            )
+            self.comment.finish_text_edit(commit=False)
 
             event.accept()
             return
 
-        super().keyPressEvent(
-            event
-        )
+        super().keyPressEvent(event)
+
     def mouseDoubleClickEvent(
         self,
         event
     ):
-
         if event.button() != Qt.LeftButton:
-
             event.accept()
             return
 
-        super().mouseDoubleClickEvent(
-            event
-        )
+        super().mouseDoubleClickEvent(event)
 
     def on_body_double_click(
         self,
         event
     ):
-
         self.start_text_edit()
+
     def contextMenuEvent(
         self,
         event
     ):
-
         event.accept()
 
 
 class CommentItem(NExGraphicsItem):
-
     def __init__(
         self,
         title="Comment",
@@ -197,9 +175,7 @@ class CommentItem(NExGraphicsItem):
     # -----------------------------------------------------
 
     def on_size_changed(self):
-
         if self.text_editor:
-
             self.text_editor.setTextWidth(
                 max(
                     60,
@@ -213,9 +189,7 @@ class CommentItem(NExGraphicsItem):
 
 
     def get_text_rect(self):
-
         body_rect = self.get_body_rect()
-
         return QRectF(
             body_rect.left() + 10,
             body_rect.top() + 8,
@@ -228,14 +202,10 @@ class CommentItem(NExGraphicsItem):
     # -----------------------------------------------------
 
     def start_text_edit(self):
-
         if self.text_editor:
             return
 
-        self.text_editor = CommentTextEditor(
-            self
-        )
-
+        self.text_editor = CommentTextEditor(self)
         self.text_editor.setFocus()
 
         self.update()
@@ -265,16 +235,10 @@ class CommentItem(NExGraphicsItem):
         scene = self.scene()
 
         try:
-
-            editor.setParentItem(
-                None
-            )
+            editor.setParentItem(None)
 
             if scene:
-
-                scene.removeItem(
-                    editor
-                )
+                scene.removeItem(editor)
 
         except RuntimeError:
             pass
@@ -286,16 +250,9 @@ class CommentItem(NExGraphicsItem):
 
 
     def get_text_option(self):
-
         option = QTextOption()
-
-        option.setWrapMode(
-            QTextOption.WrapAnywhere
-        )
-
-        option.setAlignment(
-            Qt.AlignJustify
-        )
+        option.setWrapMode(QTextOption.WrapAnywhere)
+        option.setAlignment(Qt.AlignJustify)
 
         return option
 
@@ -308,14 +265,12 @@ class CommentItem(NExGraphicsItem):
         self,
         event
     ):
-
         self.start_text_edit()
 
     def contextMenuEvent(
         self,
         event
     ):
-
         try:
             from PySide2.QtWidgets import QMenu
 
@@ -324,39 +279,23 @@ class CommentItem(NExGraphicsItem):
 
         menu = QMenu()
 
-        edit_action = menu.addAction(
-            "Edit"
-        )
+        edit_action = menu.addAction("Edit")
+        color_action = menu.addAction("Color")
+        delete_action = menu.addAction("Delete")
 
-        color_action = menu.addAction(
-            "Color"
-        )
-
-        delete_action = menu.addAction(
-            "Delete"
-        )
-
-        result = menu.exec_(
-            event.screenPos()
-        )
+        result = menu.exec_(event.screenPos())
 
         if result == edit_action:
-
             self.start_text_edit()
 
         elif result == color_action:
-
             self.pick_color()
 
         elif result == delete_action:
-
             scene = self.scene()
 
             if scene:
-
-                scene.removeItem(
-                    self
-                )
+                scene.removeItem(self)
 
     # -----------------------------------------------------
     # Paint
@@ -369,9 +308,7 @@ class CommentItem(NExGraphicsItem):
         widget
     ):
 
-        self.paint_base_panel(
-            painter
-        )
+        self.paint_base_panel(painter)
 
         if self.text_editor is None:
 
@@ -393,27 +330,14 @@ class CommentItem(NExGraphicsItem):
 
             document = QTextDocument()
 
-            document.setPlainText(
-                self.text
-            )
-
-            document.setDefaultFont(
-                font
-            )
-
-            document.setDefaultTextOption(
-                self.get_text_option()
-            )
-
-            document.setTextWidth(
-                text_rect.width()
-            )
+            document.setPlainText(self.text)
+            document.setDefaultFont(font)
+            document.setDefaultTextOption(self.get_text_option())
+            document.setTextWidth(text_rect.width())
 
             painter.save()
 
-            painter.translate(
-                text_rect.topLeft()
-            )
+            painter.translate(text_rect.topLeft())
 
             painter.setClipRect(
                 QRectF(

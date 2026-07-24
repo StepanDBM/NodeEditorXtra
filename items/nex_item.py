@@ -51,12 +51,9 @@ class NExTitleEditor(QGraphicsTextItem):
         super().__init__(
             item
         )
-
         self.nex_item = item
 
-        self.setPlainText(
-            item.title
-        )
+        self.setPlainText(item.title)
 
         self.setTextInteractionFlags(
             Qt.TextEditorInteraction
@@ -70,9 +67,7 @@ class NExTitleEditor(QGraphicsTextItem):
             )
         )
 
-        self.setZValue(
-            999
-        )
+        self.setZValue(999)
 
         title_rect = item.get_title_rect()
 
@@ -92,58 +87,41 @@ class NExTitleEditor(QGraphicsTextItem):
         self,
         event
     ):
+        super().focusOutEvent(event)
 
-        super().focusOutEvent(
-            event
-        )
-
-        self.nex_item.finish_title_edit(
-            commit=True
-        )
+        self.nex_item.finish_title_edit(commit=True)
 
     def keyPressEvent(
         self,
         event
     ):
-
         if event.key() in (
             Qt.Key_Return,
             Qt.Key_Enter
         ):
 
-            self.nex_item.finish_title_edit(
-                commit=True
-            )
+            self.nex_item.finish_title_edit(commit=True)
 
             event.accept()
             return
 
         if event.key() == Qt.Key_Escape:
-
-            self.nex_item.finish_title_edit(
-                commit=False
-            )
+            self.nex_item.finish_title_edit(commit=False)
 
             event.accept()
             return
 
-        super().keyPressEvent(
-            event
-        )
+        super().keyPressEvent(event)
 
     def mouseDoubleClickEvent(
         self,
         event
     ):
-
         if event.button() != Qt.LeftButton:
-
             event.accept()
             return
 
-        super().mouseDoubleClickEvent(
-            event
-        )
+        super().mouseDoubleClickEvent(event)
 
     def contextMenuEvent(
         self,
@@ -251,9 +229,7 @@ class NExGraphicsItem(QGraphicsItem):
             True
         )
 
-        self.setAcceptHoverEvents(
-            True
-        )
+        self.setAcceptHoverEvents(True)
 
         self.setAcceptedMouseButtons(
             Qt.LeftButton
@@ -265,7 +241,6 @@ class NExGraphicsItem(QGraphicsItem):
     # -----------------------------------------------------
 
     def boundingRect(self):
-
         return QRectF(
             0,
             0,
@@ -274,7 +249,6 @@ class NExGraphicsItem(QGraphicsItem):
         )
 
     def get_area(self):
-
         return float(
             self.width
             * self.height
@@ -303,12 +277,10 @@ class NExGraphicsItem(QGraphicsItem):
         self.update()
 
     def on_size_changed(self):
-
         pass
 
 
     def get_header_rect(self):
-
         return QRectF(
             0,
             0,
@@ -318,7 +290,6 @@ class NExGraphicsItem(QGraphicsItem):
 
 
     def get_title_rect(self):
-
         return QRectF(
             10,
             0,
@@ -326,7 +297,6 @@ class NExGraphicsItem(QGraphicsItem):
             self.header_height
         )
     def get_close_rect(self):
-
         size = 18
         margin = 6
 
@@ -343,14 +313,10 @@ class NExGraphicsItem(QGraphicsItem):
 
 
     def delete_self(self):
-
         scene = self.scene()
 
         if scene:
-
-            scene.removeItem(
-                self
-            )
+            scene.removeItem(self)
         self.notify_items_changed(reason = "delete") #eventHandler
 
 
@@ -397,7 +363,6 @@ class NExGraphicsItem(QGraphicsItem):
         )
 
     def get_body_rect(self):
-
         return QRectF(
             0,
             self.header_height,
@@ -412,7 +377,6 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         item
     ):
-
         return bool(
             getattr(
                 item,
@@ -425,7 +389,6 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         item
     ):
-
         return bool(
             getattr(
                 item,
@@ -438,7 +401,6 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         item
     ):
-
         return bool(
             getattr(
                 item,
@@ -448,7 +410,6 @@ class NExGraphicsItem(QGraphicsItem):
         )
 
     def get_scene_nex_items(self):
-
         scene = self.scene()
 
         if not scene:
@@ -461,7 +422,6 @@ class NExGraphicsItem(QGraphicsItem):
         ]
 
     def get_scene_parentable_items(self):
-
         return [
             item
             for item in self.get_scene_nex_items()
@@ -469,7 +429,6 @@ class NExGraphicsItem(QGraphicsItem):
         ]
 
     def get_scene_container_items(self):
-
         return [
             item
             for item in self.get_scene_nex_items()
@@ -484,22 +443,14 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         node_names
     ):
-
         node_map = NEx.get_scene_node_map()
-
         node_items = []
 
         for node_name in node_names:
-
-            item = node_map.get(
-                node_name
-            )
+            item = node_map.get(node_name)
 
             if item:
-
-                node_items.append(
-                    item
-                )
+                node_items.append(item)
 
         return node_items
 
@@ -508,38 +459,25 @@ class NExGraphicsItem(QGraphicsItem):
     # -----------------------------------------------------
 
     def get_z_step(self):
-
         return 10
 
 
     def get_native_node_z_range(self):
-
         scene = self.scene()
 
         if not scene:
-            return (
-                0,
-                0
-            )
+            return (0,0)
 
         z_values = []
-
         for item in scene.items():
-
-            if self.is_nex_item(
-                item
-            ):
+            if self.is_nex_item(item):
                 continue
 
             try:
-
-                node_name = NEx.get_node_name(
-                    item
-                )
+                node_name = NEx.get_node_name(item)
 
             except RuntimeError:
                 node_name = None
-
             except Exception:
                 node_name = None
 
@@ -547,48 +485,27 @@ class NExGraphicsItem(QGraphicsItem):
                 continue
 
             try:
-
-                z_values.append(
-                    item.zValue()
-                )
+                z_values.append(item.zValue())
 
             except RuntimeError:
                 pass
-
             except Exception:
                 pass
 
         if not z_values:
+            return (0,0)
 
-            return (
-                0,
-                0
-            )
-
-        return (
-            min(
-                z_values
-            ),
-            max(
-                z_values
-            )
-        )
+        return (min(z_values), max(z_values))
 
 
     def get_container_z_base(self):
-
-        native_min_z, native_max_z = (
-            self.get_native_node_z_range()
-        )
+        native_min_z, native_max_z = self.get_native_node_z_range()
 
         return native_min_z - 1000
 
 
     def get_leaf_item_z_base(self):
-
-        native_min_z, native_max_z = (
-            self.get_native_node_z_range()
-        )
+        native_min_z, native_max_z = self.get_native_node_z_range()
 
         return native_max_z + 1000
 
@@ -597,19 +514,11 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         item
     ):
-
         try:
-
-            index = scene_index.get_scene_index(
-                scene=self.scene()
-            )
-
-            return index.get_depth(
-                item
-            )
+            index = scene_index.get_scene_index(scene=self.scene())
+            return index.get_depth(item)
 
         except Exception:
-
             return 0
 
 
@@ -617,15 +526,9 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         item
     ):
+        depth = self.get_hierarchy_depth_for_item(item)
 
-        depth = self.get_hierarchy_depth_for_item(
-            item
-        )
-
-        if self.is_container_nex_item(
-            item
-        ):
-
+        if self.is_container_nex_item(item):
             return (
                 self.get_container_z_base()
                 + (
@@ -647,31 +550,23 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         item
     ):
-
         try:
-
             item.setZValue(
-                self.get_z_value_for_item(
-                    item
-                )
+                self.get_z_value_for_item(item)
             )
 
         except RuntimeError:
             pass
-
         except Exception:
             pass
 
 
     def update_z_hierarchy(self):
-
         scene = self.scene()
-
         if not scene:
             return
 
         try:
-
             index = scene_index.get_scene_index(
                 scene=scene
             )
@@ -679,13 +574,10 @@ class NExGraphicsItem(QGraphicsItem):
             nex_items = index.get_nex_items()
 
         except Exception:
-
             nex_items = [
                 item
                 for item in scene.items()
-                if self.is_nex_item(
-                    item
-                )
+                if self.is_nex_item(item)
             ]
 
         nex_items = sorted(
@@ -696,10 +588,7 @@ class NExGraphicsItem(QGraphicsItem):
         )
 
         for item in nex_items:
-
-            self.update_z_for_item(
-                item
-            )
+            self.update_z_for_item(item)
 
     # -----------------------------------------------------
     # FocusViewList Event Abstraction
@@ -709,16 +598,12 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         reason="unknown"
     ):
-
         try:
-
             import NEx_SDBM.core.utilities.events as events
-
             events.emit_item_changed(
                 self,
                 reason=reason
             )
-
         except Exception:
             pass
 
@@ -727,14 +612,9 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         reason="unknown"
     ):
-
         try:
-
             import NEx_SDBM.core.utilities.events as events
-
-            events.emit_items_changed(
-                reason=reason
-            )
+            events.emit_items_changed(reason=reason)
 
         except Exception:
             pass
@@ -747,12 +627,8 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         scene_rect
     ):
-
         try:
-
-            return self.sceneBoundingRect().contains(
-                scene_rect
-            )
+            return self.sceneBoundingRect().contains(scene_rect)
 
         except RuntimeError:
             return False
@@ -764,48 +640,29 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         child_item
     ):
-
         try:
-
-            index = scene_index.get_scene_index(
-                scene=self.scene()
-            )
-
-            return index.get_parent(
-                child_item
-            )
+            index = scene_index.get_scene_index(scene=self.scene())
+            return index.get_parent(child_item)
 
         except Exception:
-
             return None
 
 
     def get_parent_container(self):
+        return self.get_parent_container_for_item(self)
 
-        return self.get_parent_container_for_item(
-            self
-        )
     def item_is_ancestor_of_item(
         self,
         possible_ancestor,
         item
     ):
-
-        parent = self.get_parent_container_for_item(
-            item
-        )
-
+        parent = self.get_parent_container_for_item(item)
         safety = 0
 
         while parent and safety < 100:
-
             if parent is possible_ancestor:
                 return True
-
-            parent = self.get_parent_container_for_item(
-                parent
-            )
-
+            parent = self.get_parent_container_for_item(parent)
             safety += 1
 
         return False
@@ -815,20 +672,12 @@ class NExGraphicsItem(QGraphicsItem):
         child_item,
         possible_parent
     ):
-
-        parent = self.get_parent_container_for_item(
-            child_item
-        )
-
+        parent = self.get_parent_container_for_item(child_item)
         while parent:
-
             if parent is possible_parent:
                 return True
 
-            parent = self.get_parent_container_for_item(
-                parent
-            )
-
+            parent = self.get_parent_container_for_item(parent)
         return False
 
 
@@ -837,12 +686,8 @@ class NExGraphicsItem(QGraphicsItem):
         child_item,
         possible_parent
     ):
-
         try:
-
-            index = scene_index.get_scene_index(
-                scene=self.scene()
-            )
+            index = scene_index.get_scene_index(scene=self.scene())
 
             return index.is_ancestor(
                 possible_parent,
@@ -850,46 +695,27 @@ class NExGraphicsItem(QGraphicsItem):
             )
 
         except Exception:
-
             return False
 
 
     def get_direct_child_nex_items(self):
-
         try:
-
-            index = scene_index.get_scene_index(
-                scene=self.scene()
-            )
-
-            return index.get_children(
-                self
-            )
+            index = scene_index.get_scene_index(scene=self.scene())
+            return index.get_children(self)
 
         except Exception:
-
             return []
 
     def filter_top_level_items(
         self,
         items
     ):
-
         try:
-
-            index = scene_index.get_scene_index(
-                scene=self.scene()
-            )
-
-            return index.filter_top_level_nex_items(
-                items
-            )
+            index = scene_index.get_scene_index(scene=self.scene())
+            return index.filter_top_level_nex_items(items)
 
         except Exception:
-
-            return list(
-                items
-            )
+            return list(items)
 
 
     # -----------------------------------------------------
@@ -897,18 +723,12 @@ class NExGraphicsItem(QGraphicsItem):
     # -----------------------------------------------------
 
     def get_direct_node_names(self):
-
         return []
 
     def update_direct_contents(self):
+        self.contained_nodes = self.get_direct_node_names()
 
-        self.contained_nodes = (
-            self.get_direct_node_names()
-        )
-
-        self.child_nex_items = (
-            self.get_direct_child_nex_items()
-        )
+        self.child_nex_items = self.get_direct_child_nex_items()
 
     def cache_subtree_for_drag(
         self,
@@ -923,20 +743,12 @@ class NExGraphicsItem(QGraphicsItem):
         children = []
 
         try:
+            index = scene_index.get_scene_index(scene=self.scene())
 
-            index = scene_index.get_scene_index(
-                scene=self.scene()
-            )
-
-            if self.is_container_nex_item(
-                item
-            ):
-
+            if self.is_container_nex_item(item):
                 # NEx children come from the same direct-parent graph.
                 children = list(
-                    index.get_children(
-                        item
-                    )
+                    index.get_children(item)
                 )
 
                 # Native Maya node children also come directly from
@@ -948,25 +760,15 @@ class NExGraphicsItem(QGraphicsItem):
                 # here, because that re-solves native node identity
                 # outside the hierarchy cache and can move wrong nodes.
                 node_items = list(
-                    index.get_native_nodes_for_parent(
-                        item
-                    )
+                    index.get_native_nodes_for_parent(item)
                 )
 
                 for node_item in node_items:
-
-                    node_name = index.get_native_node_name(
-                        node_item
-                    )
-
+                    node_name = index.get_native_node_name(node_item)
                     if node_name:
-
-                        node_names.append(
-                            node_name
-                        )
+                        node_names.append(node_name)
 
         except Exception:
-
             node_names = []
             node_items = []
             children = []
@@ -979,23 +781,15 @@ class NExGraphicsItem(QGraphicsItem):
         }
 
         for child in children:
-
-            self.cache_subtree_for_drag(
-                child
-            )
+            self.cache_subtree_for_drag(child)
 
     def cache_drag_tree(self):
-
         scene = self.scene()
 
         if not scene:
             return
-
         try:
-
-            index = scene_index.rebuild_scene_index(
-                scene=scene
-            )
+            index = scene_index.rebuild_scene_index(scene=scene)
 
         except Exception:
 
@@ -1004,50 +798,28 @@ class NExGraphicsItem(QGraphicsItem):
         selected_items = [
             item
             for item in scene.selectedItems()
-            if self.is_nex_item(
-                item
-            )
+            if self.is_nex_item(item)
         ]
 
         if self not in selected_items:
-
-            selected_items.append(
-                self
-            )
+            selected_items.append(self)
 
         try:
-
             if index:
-
-                self._drag_roots = (
-                    index.filter_top_level_nex_items(
-                        selected_items
-                    )
-                )
+                self._drag_roots = index.filter_top_level_nex_items(selected_items)
 
             else:
-
-                self._drag_roots = (
-                    self.filter_top_level_items(
-                        selected_items
-                    )
-                )
+                self._drag_roots = self.filter_top_level_items(selected_items)
 
         except Exception:
-
             self._drag_roots = (
-                self.filter_top_level_items(
-                    selected_items
-                )
+                self.filter_top_level_items(selected_items)
             )
 
         self._drag_tree = {}
 
         for root in self._drag_roots:
-
-            self.cache_subtree_for_drag(
-                root
-            )
+            self.cache_subtree_for_drag(root)
 
         self._last_drag_delta = None
 
@@ -1059,25 +831,18 @@ class NExGraphicsItem(QGraphicsItem):
         visited_items=None,
         visited_native_nodes=None
     ):
-
         if visited_items is None:
-
             visited_items = set()
 
         if visited_native_nodes is None:
-
             visited_native_nodes = set()
 
         if item in visited_items:
             return
 
-        visited_items.add(
-            item
-        )
+        visited_items.add(item)
 
-        data = self._drag_tree.get(
-            item
-        )
+        data = self._drag_tree.get(item)
 
         if not data:
             return
@@ -1093,16 +858,10 @@ class NExGraphicsItem(QGraphicsItem):
         )
 
         for node_item in node_items:
-
             if node_item in visited_native_nodes:
                 continue
-
-            visited_native_nodes.add(
-                node_item
-            )
-
+            visited_native_nodes.add(node_item)
             try:
-
                 node_item.moveBy(
                     incremental_delta.x(),
                     incremental_delta.y()
@@ -1110,7 +869,6 @@ class NExGraphicsItem(QGraphicsItem):
 
             except RuntimeError:
                 pass
-
             except Exception:
                 pass
 
@@ -1118,7 +876,6 @@ class NExGraphicsItem(QGraphicsItem):
             "children",
             []
         ):
-
             self.apply_subtree_drag_delta(
                 child,
                 total_delta,
@@ -1137,16 +894,12 @@ class NExGraphicsItem(QGraphicsItem):
     ):
 
         right = (
-            abs(
-                pos.x() - self.width
-            )
+            abs(pos.x() - self.width)
             <= self.resize_margin
         )
 
         bottom = (
-            abs(
-                pos.y() - self.height
-            )
+            abs(pos.y() - self.height)
             <= self.resize_margin
         )
 
@@ -1181,9 +934,7 @@ class NExGraphicsItem(QGraphicsItem):
         pos
     ):
 
-        return self.boundingRect().contains(
-            pos
-        )
+        return self.boundingRect().contains(pos)
 
     def clear_interaction_state(self):
 
@@ -1205,35 +956,19 @@ class NExGraphicsItem(QGraphicsItem):
     # -----------------------------------------------------
 
     def get_hover_header_color(self):
-
-        color = self.clone_color(
-            self.header_color
-        )
-
-        return color.lighter(
-            self.hover_lighter_factor
-        )
+        color = self.clone_color(self.header_color)
+        return color.lighter(self.hover_lighter_factor)
 
 
     def get_pressed_header_color(self):
-
-        color = self.clone_color(
-            self.header_color
-        )
-
-        return color.lighter(
-            self.pressed_lighter_factor
-        )
+        color = self.clone_color(self.header_color)
+        return color.lighter(self.pressed_lighter_factor)
 
 
     def get_paint_header_color(self):
-
         if self._pressed:
-
             return self.get_pressed_header_color()
-
         if self._hovered:
-
             return self.get_hover_header_color()
 
         return self.header_color
@@ -1242,7 +977,6 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         color
     ):
-
         return QColor(
             color.red(),
             color.green(),
@@ -1252,92 +986,60 @@ class NExGraphicsItem(QGraphicsItem):
 
 
     def get_hover_background_color(self):
-
-        color = self.clone_color(
-            self.background_color
-        )
-
-        return color.lighter(
-            self.hover_lighter_factor
-        )
+        color = self.clone_color(self.background_color)
+        return color.lighter(self.hover_lighter_factor)
 
 
     def get_pressed_background_color(self):
-
-        color = self.clone_color(
-            self.background_color
-        )
-
-        return color.lighter(
-            self.pressed_lighter_factor
-        )
+        color = self.clone_color(self.background_color)
+        return color.lighter(self.pressed_lighter_factor)
 
 
     def get_normal_border_color(self):
+        color = self.clone_color(self.background_color)
 
-        color = self.clone_color(
-            self.background_color
-        )
-
-        color.setAlpha(
-            self.normal_border_alpha
-        )
-
-        return color.darker(
-            self.normal_border_darker_factor
-        )
+        color.setAlpha(self.normal_border_alpha)
+        return color.darker(self.normal_border_darker_factor)
 
 
     def get_selected_border_color(self):
-
         return self.selected_border_color
 
 
     def get_pressed_border_color(self):
-
         return self.selected_border_color
 
 
     def get_paint_background_color(self):
-
         if self._pressed:
-
             return self.get_pressed_background_color()
 
         if self._hovered:
-
             return self.get_hover_background_color()
 
         return self.background_color
 
 
     def get_paint_border_color(self):
-
         if self._pressed:
-
             return self.get_pressed_border_color()
 
         if self.isSelected():
-
             return self.get_selected_border_color()
 
         return self.get_normal_border_color()
 
 
     def get_paint_border_width(self):
-
         if self._pressed:
-
             return self.pressed_border_width
 
         if self.isSelected():
-
             return self.selected_border_width
 
         return self.normal_border_width
 
     def pick_color(self):
-
         picked_color = QColorDialog.getColor(
             self.background_color,
             None,
@@ -1356,9 +1058,7 @@ class NExGraphicsItem(QGraphicsItem):
             alpha
         )
 
-        self.on_color_changed(
-            picked_color
-        )
+        self.on_color_changed(picked_color)
 
         self.update()
         self.notify_item_changed(reason = "style") #eventHandler
@@ -1367,20 +1067,10 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         picked_color
     ):
+        header_alpha = self.header_color.alpha()
 
-        header_alpha = (
-            self.header_color.alpha()
-        )
-
-        header_color = QColor(
-            picked_color
-        ).darker(
-            self.normal_header_darker_factor
-        )
-
-        header_color.setAlpha(
-            header_alpha
-        )
+        header_color = QColor(picked_color).darker(self.normal_header_darker_factor)
+        header_color.setAlpha(header_alpha)
 
         self.header_color = header_color
 
@@ -1399,12 +1089,9 @@ class NExGraphicsItem(QGraphicsItem):
         if self.title_editor:
             return
 
-        self.title_editor = NExTitleEditor(
-            self
-        )
+        self.title_editor = NExTitleEditor(self)
 
         self.title_editor.setFocus()
-
         self.update()
 
 
@@ -1412,7 +1099,6 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         commit=True
     ):
-
         if not self.title_editor:
             return
 
@@ -1420,7 +1106,6 @@ class NExGraphicsItem(QGraphicsItem):
         self.title_editor = None
 
         if commit:
-
             new_title = (
                 editor
                 .toPlainText()
@@ -1429,34 +1114,22 @@ class NExGraphicsItem(QGraphicsItem):
 
             if new_title:
                 self.title = new_title
-                self.on_title_changed()
         self.notify_item_changed(reason = "title") #eventHandler
         scene = self.scene()
 
         try:
 
-            editor.setParentItem(
-                None
-            )
+            editor.setParentItem(None)
 
             if scene:
 
-                scene.removeItem(
-                    editor
-                )
+                scene.removeItem(editor)
 
         except RuntimeError:
             pass
-
         except Exception:
             pass
-
         self.update()
-
-
-    def on_title_changed(self):
-
-        pass
 
 
     # -----------------------------------------------------
@@ -1467,7 +1140,6 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         event
     ):
-
         self._x_pressed = (
             self.get_close_rect().contains(
                 event.pos()
@@ -1475,7 +1147,6 @@ class NExGraphicsItem(QGraphicsItem):
         )
 
         if self._x_pressed:
-
             self._pressed = True
             self.update()
 
@@ -1485,16 +1156,11 @@ class NExGraphicsItem(QGraphicsItem):
         self._pressed = True
         self.update()
 
-        edge = self.get_resize_edge(
-            event.pos()
-        )
+        edge = self.get_resize_edge(event.pos())
 
-        super().mousePressEvent(
-            event
-        )
+        super().mousePressEvent(event)
 
         if edge:
-
             self._resizing = True
             self._resize_edge = edge
             self._resize_start_mouse = event.scenePos()
@@ -1504,17 +1170,9 @@ class NExGraphicsItem(QGraphicsItem):
             event.accept()
             return
 
-        if self.can_drag_from_pos(
-            event.pos()
-        ):
-
-            self._drag_start_mouse = (
-                event.scenePos()
-            )
-
-            self._drag_start_pos = (
-                self.pos()
-            )
+        if self.can_drag_from_pos(event.pos()):
+            self._drag_start_mouse = event.scenePos()
+            self._drag_start_pos = self.pos()
 
             self._dragging = False
             self._drag_tree_cached = False
@@ -1525,17 +1183,12 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         event
     ):
-
         if self._x_pressed:
-
             self._x_pressed = False
             self._pressed = False
             self.update()
 
-            if self.get_close_rect().contains(
-                event.pos()
-            ):
-
+            if self.get_close_rect().contains(event.pos()):
                 self.delete_self()
 
             event.accept()
@@ -1543,24 +1196,18 @@ class NExGraphicsItem(QGraphicsItem):
 
         self._pressed = False
         self.update()
-
-        self.setCursor(
-            Qt.ArrowCursor
-        )
+        self.setCursor(Qt.ArrowCursor)
 
         if self._resizing:
-
             self._resizing = False
             self._resize_edge = None
             self._drag_tree_cached = False
             try:
-
                 scene_index.mark_scene_index_dirty()
 
             except Exception:
                 pass
             try:
-
                 self.notify_item_changed(reason="geometry")
 
             except Exception:
@@ -1569,7 +1216,6 @@ class NExGraphicsItem(QGraphicsItem):
             return
 
         try:
-
             scene_index.mark_scene_index_dirty()
 
         except Exception:
@@ -1579,42 +1225,30 @@ class NExGraphicsItem(QGraphicsItem):
         self.update_z_hierarchy()
         self.notify_item_changed(reason = "geometry") #eventHandler
 
-        super().mouseReleaseEvent(
-            event
-        )
+        super().mouseReleaseEvent(event)
 
     def mouseMoveEvent(
         self,
         event
     ):
-
         if self._resizing:
+            delta = event.scenePos() - self._resize_start_mouse
 
-            delta = (
-                event.scenePos()
-                - self._resize_start_mouse
-            )
-
-            self.setCursor(
-                Qt.ClosedHandCursor
-            )
+            self.setCursor(Qt.ClosedHandCursor)
 
             if self._resize_edge == "right":
-
                 self.set_size(
                     self._start_width + delta.x(),
                     self.height
                 )
 
             elif self._resize_edge == "bottom":
-
                 self.set_size(
                     self.width,
                     self._start_height + delta.y()
                 )
 
             elif self._resize_edge == "bottom_right":
-
                 self.set_size(
                     self._start_width + delta.x(),
                     self._start_height + delta.y()
@@ -1625,9 +1259,7 @@ class NExGraphicsItem(QGraphicsItem):
 
         if self._drag_start_mouse is None:
             return
-
         if not self._dragging:
-
             move_distance = (
                 event.scenePos()
                 - self._drag_start_mouse
@@ -1639,9 +1271,7 @@ class NExGraphicsItem(QGraphicsItem):
             self._dragging = True
 
             if not self._drag_tree_cached:
-
                 self.cache_drag_tree()
-
                 self._drag_tree_cached = True
 
         delta = (
@@ -1650,11 +1280,9 @@ class NExGraphicsItem(QGraphicsItem):
         )
 
         if self._last_drag_delta is None:
-
             incremental_delta = delta
 
         else:
-
             incremental_delta = (
                 delta
                 - self._last_drag_delta
@@ -1666,9 +1294,7 @@ class NExGraphicsItem(QGraphicsItem):
         visited_native_nodes = set()
 
         for root in self._drag_roots:
-
             try:
-
                 self.apply_subtree_drag_delta(
                     root,
                     delta,
@@ -1679,7 +1305,6 @@ class NExGraphicsItem(QGraphicsItem):
 
             except RuntimeError:
                 pass
-
             except Exception:
                 pass
 
@@ -1689,9 +1314,7 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         event
     ):
-
         if event.button() != Qt.LeftButton:
-
             event.accept()
             return
 
@@ -1700,25 +1323,17 @@ class NExGraphicsItem(QGraphicsItem):
         self._pressed = False
         self.update()
 
-        if self.get_close_rect().contains(
-            event.pos()
-        ):
-
+        if self.get_close_rect().contains(event.pos()):
             event.accept()
             return
 
-        if self.get_title_rect().contains(
-            event.pos()
-        ):
-
+        if self.get_title_rect().contains(event.pos()):
             self.start_title_edit()
 
             event.accept()
             return
 
-        self.on_body_double_click(
-            event
-        )
+        self.on_body_double_click(event)
 
         event.accept()
     # -----------------------------------------------------
@@ -1729,103 +1344,68 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         event
     ):
-
         if not self._hovered:
-
             self._hovered = True
             self.update()
 
-        super().hoverEnterEvent(
-            event
-        )
+        super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(
         self,
         event
     ):
-
         changed = False
-
         if self._hovered:
-
             self._hovered = False
             changed = True
 
         if self._pressed:
-
             self._pressed = False
             changed = True
 
         self._hover_cursor_state = None
-
-        self.setCursor(
-            Qt.ArrowCursor
-        )
+        self.setCursor(Qt.ArrowCursor)
 
         if changed:
-
             self.update()
-
-        super().hoverLeaveEvent(
-            event
-        )
+        super().hoverLeaveEvent(event)
 
     def hoverMoveEvent(
         self,
         event
     ):
-
-        if self.get_close_rect().contains(
-            event.pos()
-        ):
-
+        if self.get_close_rect().contains(event.pos()):
             cursor_state = "close"
             cursor = Qt.ArrowCursor
 
         else:
-
-            edge = self.get_resize_edge(
-                event.pos()
-            )
+            edge = self.get_resize_edge(event.pos())
 
             if edge == "right":
-
                 cursor_state = "resize_right"
                 cursor = Qt.SizeHorCursor
 
             elif edge == "bottom":
-
                 cursor_state = "resize_bottom"
                 cursor = Qt.SizeVerCursor
 
             elif edge == "bottom_right":
-
                 cursor_state = "resize_bottom_right"
                 cursor = Qt.SizeFDiagCursor
 
-            elif self.can_drag_from_pos(
-                event.pos()
-            ):
-
+            elif self.can_drag_from_pos(event.pos()):
                 cursor_state = "drag"
                 cursor = Qt.OpenHandCursor
 
             else:
-
                 cursor_state = "default"
                 cursor = Qt.ArrowCursor
 
         if cursor_state != self._hover_cursor_state:
-
             self._hover_cursor_state = cursor_state
+            self.setCursor(cursor)
 
-            self.setCursor(
-                cursor
-            )
-
-        super().hoverMoveEvent(
-            event
-        )
+        super().hoverMoveEvent(event)
         
     # -----------------------------------------------------
     # Paint Abstraction
@@ -1835,25 +1415,11 @@ class NExGraphicsItem(QGraphicsItem):
         painter
     ):
 
-        painter.setRenderHint(
-            QPainter.Antialiasing
-        )
-
-        background_color = (
-            self.get_paint_background_color()
-        )
-
-        header_color = (
-            self.get_paint_header_color()
-        )
-
-        border_color = (
-            self.get_paint_border_color()
-        )
-
-        border_width = (
-            self.get_paint_border_width()
-        )
+        painter.setRenderHint(QPainter.Antialiasing)
+        background_color = self.get_paint_background_color()
+        header_color = self.get_paint_header_color()
+        border_color = self.get_paint_border_color()
+        border_width = self.get_paint_border_width()
 
         painter.setBrush(
             QBrush(
@@ -1886,13 +1452,8 @@ class NExGraphicsItem(QGraphicsItem):
             self.roundness
         )
 
-        self.paint_title(
-            painter
-        )
-
-        self.paint_close_button(
-            painter
-        )
+        self.paint_title(painter)
+        self.paint_close_button(painter)
 
 
     def paint_title(
