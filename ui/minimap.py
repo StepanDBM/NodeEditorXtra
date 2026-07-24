@@ -50,69 +50,111 @@ import NEx_SDBM.core.scene_view as scene_view
 import NEx_SDBM.core.utilities.events as events
 
 
-class MiniMapViewFilter(QObject):
+def eventFilter(
+    self,
+    obj,
+    event
+):
 
-    def __init__(
-        self,
-        minimap
-    ):
+    event_type = event.type()
 
-        super().__init__(
-            minimap
-        )
+    if event_type == QEvent.Destroy:
 
-        self.minimap = minimap
+        try:
 
+            self.minimap.on_node_editor_view_destroyed()
 
-    def eventFilter(
-        self,
-        obj,
-        event
-    ):
+        except Exception:
+            pass
 
-        event_type = event.type()
+        return False
 
-        if event_type == QEvent.Destroy:
+    # -----------------------------------------------------
+    # Wheel on actual Maya Node Editor.
+    # This is NOT hover.
+    # It changes the Node Editor viewport, so only update
+    # the green viewport rectangle, not item geometry.
+    # -----------------------------------------------------
 
-            try:
+    if event_type == QEvent.Wheel:
 
-                self.minimap.on_node_editor_view_destroyed()
+        try:
 
-            except Exception:
-                pass
+            self.minimap.schedule_viewport_refresh()
+
+            QTimer.singleShot(
+                16,
+                self.minimap.schedule_viewport_refresh
+            )
+
+            QTimer.singleShot(
+                50,
+                self.minimap.schedule_viewport_refresh
+            )
+
+            QTimer.singleShot(
+                100,
+                self.minimap.schedule_viewport_refresh
+            )
+
+        except Exception:
+            pass
+
+        return False
+
+    # -----------------------------------------------------
+    # Mouse move on actual Maya Node Editor.
+    # Pure hover should do nothing.
+    # Dragging with a button pressed may mean:
+    #     - native node moving
+    #     - NEx item moving
+    #     - view panning
+    # So update cached geometry only when a button is down.
+    # -----------------------------------------------------
+
+    if event_type == QEvent.MouseMove:
+
+        try:
+
+            buttons = event.buttons()
+
+        except Exception:
+
+            buttons = Qt.NoButton
+
+        if buttons == Qt.NoButton:
 
             return False
 
-        # Wheel on actual Maya Node Editor:
-        # viewport changed, not item geometry.
-        if event_type == QEvent.Wheel:
+        try:
 
-            try:
+            self.minimap.schedule_geometry_refresh()
 
-                self.minimap.schedule_viewport_refresh()
+        except Exception:
+            pass
 
-                QTimer.singleShot(
-                    16,
-                    self.minimap.schedule_viewport_refresh
-                )
+        return False
 
-                QTimer.singleShot(
-                    50,
-                    self.minimap.schedule_viewport_refresh
-                )
+    # -----------------------------------------------------
+    # Other viewport-related events.
+    # -----------------------------------------------------
 
-            except Exception:
-                pass
+    if event_type in (
+        QEvent.MouseButtonPress,
+        QEvent.MouseButtonRelease,
+        QEvent.Resize,
+        QEvent.Show,
+        QEvent.Hide
+    ):
 
-            return False
+        try:
 
-        # Mouse move in Node Editor may mean:
-        # - viewport pan
-        # - native node drag
-        # - NEx item drag
-        #
-        # So update cached geometry cheaply.
-        if event_type == QEvent.MouseMove:
+            self.minimap.schedule_viewport_refresh()
+
+        except Exception:
+            pass
+
+        if event_type == QEvent.MouseButtonRelease:
 
             try:
 
@@ -121,35 +163,9 @@ class MiniMapViewFilter(QObject):
             except Exception:
                 pass
 
-            return False
-
-        if event_type in (
-            QEvent.MouseButtonPress,
-            QEvent.MouseButtonRelease,
-            QEvent.Resize,
-            QEvent.Show,
-            QEvent.Hide
-        ):
-
-            try:
-
-                self.minimap.schedule_viewport_refresh()
-
-            except Exception:
-                pass
-
-            if event_type == QEvent.MouseButtonRelease:
-
-                try:
-
-                    self.minimap.schedule_geometry_refresh()
-
-                except Exception:
-                    pass
-
-            return False
-
         return False
+
+    return False
 
 
 class MiniMapWidget(QWidget):
