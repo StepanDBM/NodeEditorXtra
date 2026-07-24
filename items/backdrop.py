@@ -38,6 +38,7 @@ except ImportError:
 import NEx_SDBM.core.node_editor as NEx
 
 from NEx_SDBM.items.nex_item import NExGraphicsItem
+import NEx_SDBM.core.utilities.scene_index as scene_index
 
 
 class BackdropItem(NExGraphicsItem):
@@ -160,68 +161,68 @@ class BackdropItem(NExGraphicsItem):
         scene_rect
     ):
 
-        candidates = []
+        try:
 
-        for item in self.get_scene_container_items():
-
-            try:
-
-                if item.sceneBoundingRect().contains(
-                    scene_rect
-                ):
-
-                    candidates.append(
-                        item
-                    )
-
-            except RuntimeError:
-                continue
-
-            except Exception:
-                continue
-
-        if not candidates:
-            return None
-
-        candidates = sorted(
-            candidates,
-            key=lambda item: (
-                item.get_area(),
-                item.zValue()
+            index = scene_index.get_scene_index(
+                scene=self.scene()
             )
-        )
 
-        return candidates[0]
+            candidates = []
+
+            for container in index.get_container_items():
+
+                rect = index.get_rect(
+                    container
+                )
+
+                if not rect:
+                    continue
+
+                try:
+
+                    if rect.contains(
+                        scene_rect
+                    ):
+
+                        candidates.append(
+                            container
+                        )
+
+                except Exception:
+                    continue
+
+            if not candidates:
+                return None
+
+            candidates = sorted(
+                candidates,
+                key=lambda item: (
+                    item.get_area(),
+                    item.zValue()
+                )
+            )
+
+            return candidates[0]
+
+        except Exception:
+
+            return None
 
     def get_direct_node_names(self):
 
-        direct_nodes = []
+        try:
 
-        scene_map = NEx.get_scene_node_map()
-
-        for node_name, item in scene_map.items():
-
-            try:
-
-                node_rect = item.sceneBoundingRect()
-
-            except RuntimeError:
-                continue
-
-            except Exception:
-                continue
-
-            owner = self.find_smallest_owner_for_rect(
-                node_rect
+            index = scene_index.get_scene_index(
+                scene=self.scene()
             )
 
-            if owner is self:
+            return index.get_native_node_name_list_for_parent(
+                self
+            )
 
-                direct_nodes.append(
-                    node_name
-                )
+        except Exception:
 
-        return direct_nodes
+            return []
 
     def update_contained_nodes(self):
 
@@ -274,20 +275,20 @@ class BackdropItem(NExGraphicsItem):
         item
     ):
 
-        parent = self.get_parent_container_for_item(
-            self
-        )
+        try:
 
-        while parent:
-
-            if parent is item:
-                return True
-
-            parent = self.get_parent_container_for_item(
-                parent
+            index = scene_index.get_scene_index(
+                scene=self.scene()
             )
 
-        return False
+            return index.is_ancestor(
+                item,
+                self
+            )
+
+        except Exception:
+
+            return False
 
     def rect_is_admissible(
         self,
@@ -347,71 +348,20 @@ class BackdropItem(NExGraphicsItem):
         item
     ):
 
-        if item is self:
+        try:
+
+            index = scene_index.get_scene_index(
+                scene=self.scene()
+            )
+
+            return index.can_container_capture_nex_item(
+                self,
+                item
+            )
+
+        except Exception:
+
             return False
-
-        # Never let this backdrop capture one of its ancestors.
-        # Example:
-        #     Child backdrop must not capture Parent backdrop.
-        if self.item_is_ancestor_of_item(
-            item,
-            self
-        ):
-            return False
-
-        # Never let a smaller/equal container wrap a larger/equal container.
-        # This blocks:
-        #     child wrapping parent
-        #     sibling-sized ambiguous nesting
-        if self.is_container_nex_item(
-            item
-        ):
-
-            try:
-
-                if item.get_area() >= self.get_area():
-                    return False
-
-            except RuntimeError:
-                return False
-
-            except Exception:
-                return False
-
-        current_parent = self.get_parent_container_for_item(
-            item
-        )
-
-        # Item has no parent yet.
-        # Safe to capture.
-        if current_parent is None:
-            return True
-
-        # Item is already directly owned by this container.
-        # Safe to keep/capture.
-        if current_parent is self:
-            return True
-
-        # Important rule:
-        # If item's current parent is an ancestor of this backdrop,
-        # this backdrop is allowed to become the more specific owner.
-        #
-        # Example:
-        #     Parent
-        #         ChildBackdrop
-        #         Node
-        #
-        # If ChildBackdrop grows over Node, Node can move from Parent
-        # ownership to ChildBackdrop ownership.
-        if self.item_is_ancestor_of_item(
-            current_parent,
-            self
-        ):
-            return True
-
-        # Otherwise the item belongs to an unrelated container.
-        # Do not steal it.
-        return False
 
     def can_capture_native_node_item(
         self,
@@ -420,37 +370,18 @@ class BackdropItem(NExGraphicsItem):
 
         try:
 
-            node_rect = node_item.sceneBoundingRect()
+            index = scene_index.get_scene_index(
+                scene=self.scene()
+            )
 
-        except RuntimeError:
-            return False
+            return index.can_container_capture_native_node(
+                self,
+                node_item
+            )
 
         except Exception:
+
             return False
-
-        owner = self.find_smallest_owner_for_rect(
-            node_rect
-        )
-
-        # Node has no owner.
-        # Safe to capture.
-        if owner is None:
-            return True
-
-        # Node is already owned by this backdrop.
-        if owner is self:
-            return True
-
-        # If the current owner is an ancestor of this backdrop,
-        # this backdrop is allowed to become the more specific owner.
-        if self.item_is_ancestor_of_item(
-            owner,
-            self
-        ):
-            return True
-
-        # Otherwise the node belongs to an unrelated container.
-        return False
 
 
     def expand_to_include_scene_rect(
@@ -498,8 +429,16 @@ class BackdropItem(NExGraphicsItem):
     
     def auto_expand_to_capture_nearby_items(self):
 
-        changed = False
+        try:
 
+            scene_index.rebuild_scene_index(
+                scene=self.scene()
+            )
+
+        except Exception:
+            pass
+
+        changed = False
         # -----------------------------------------------------
         # Maya native nodes
         # -----------------------------------------------------
@@ -566,6 +505,13 @@ class BackdropItem(NExGraphicsItem):
 
                 changed = True
         if changed:
+
+            try:
+
+                scene_index.mark_scene_index_dirty()
+
+            except Exception:
+                pass
 
             self.update_z_hierarchy()
         return changed
@@ -636,6 +582,13 @@ class BackdropItem(NExGraphicsItem):
         self.update_z_hierarchy()
 
         if was_resizing:
+
+            try:
+
+                scene_index.mark_scene_index_dirty()
+
+            except Exception:
+                pass
 
             self.auto_expand_to_capture_nearby_items()
 

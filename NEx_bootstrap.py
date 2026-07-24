@@ -7,6 +7,7 @@ from importlib import reload
 MODULES_TO_RELOAD = [
     # Core
     "NEx_SDBM.core.node_editor",
+    "NEx_SDBM.core.utilities.scene_index",
     "NEx_SDBM.core.scene_storage",
     "NEx_SDBM.core.scene_view",
     "NEx_SDBM.core.tab_observer",

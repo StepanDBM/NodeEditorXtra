@@ -50,6 +50,7 @@ from maya import cmds
 import NEx_SDBM.core.node_editor as NEx
 import NEx_SDBM.core.scene_view as scene_view
 import NEx_SDBM.core.utilities.events as events
+import NEx_SDBM.core.utilities.scene_index as scene_index
 
 
 class FocusListWidget(QWidget):
@@ -166,6 +167,9 @@ class FocusListWidget(QWidget):
         )
 
         self.tree.setAlternatingRowColors(
+            True
+        )
+        self.tree.setUniformRowHeights(
             True
         )
 
@@ -1150,99 +1154,57 @@ class FocusListWidget(QWidget):
 
     def build_hierarchy(self):
 
-        items = self.get_scene_nex_items()
+        scene = self.get_current_scene()
 
-        item_set = set(
-            items
+        if not scene:
+
+            return (
+                [],
+                {},
+                {}
+            )
+
+        index = scene_index.get_scene_index(
+            scene=scene
         )
 
+        roots = index.get_root_nex_items()
+
         children_by_parent = {}
-        roots = []
 
-        # -----------------------------------------------------
-        # NEx item hierarchy
-        # -----------------------------------------------------
+        for parent in index.get_container_items():
 
-        for item in items:
-
-            parent = self.get_parent_for_item(
-                item,
-                item_set
+            children_by_parent[parent] = index.get_children(
+                parent
             )
-
-            if parent is None:
-
-                roots.append(
-                    item
-                )
-
-            else:
-
-                children_by_parent.setdefault(
-                    parent,
-                    []
-                ).append(
-                    item
-                )
-
-        # -----------------------------------------------------
-        # Native Maya nodes under direct NEx container
-        # -----------------------------------------------------
-
-        containers = [
-            item
-            for item in items
-            if getattr(
-                item,
-                "nex_container",
-                False
-            )
-        ]
-
-        native_nodes = self.get_scene_native_node_items()
 
         native_nodes_by_parent = {}
 
-        for node_name, node_item in native_nodes:
+        for parent in index.get_container_items():
 
-            parent = self.get_direct_container_for_native_node(
-                node_item,
-                containers
+            native_node_items = index.get_native_nodes_for_parent(
+                parent
             )
 
-            if parent is None:
-                continue
+            node_data = []
 
-            native_nodes_by_parent.setdefault(
-                parent,
-                []
-            ).append(
-                (
-                    node_name,
+            for node_item in native_node_items:
+
+                node_name = index.get_native_node_name(
                     node_item
                 )
-            )
 
-        roots = self.sort_items(
-            roots
-        )
+                if not node_name:
+                    continue
 
-        for parent, children in list(
-            children_by_parent.items()
-        ):
+                node_data.append(
+                    (
+                        node_name,
+                        node_item
+                    )
+                )
 
-            children_by_parent[parent] = self.sort_items(
-                children
-            )
-
-        for parent, nodes in list(
-            native_nodes_by_parent.items()
-        ):
-
-            native_nodes_by_parent[parent] = sorted(
-                nodes,
-                key=lambda data: data[0].lower()
-            )
+            native_nodes_by_parent[parent] = node_data
 
         return (
             roots,
@@ -1342,6 +1304,10 @@ class FocusListWidget(QWidget):
 
         try:
 
+            self.tree.setUpdatesEnabled(
+                False
+            )
+
             self.tree.blockSignals(
                 True
             )
@@ -1370,7 +1336,9 @@ class FocusListWidget(QWidget):
                 )
 
             self.apply_initial_expansion()
+
             self.resize_tree_columns()
+
             self.apply_tree_filter()
 
         finally:
@@ -1378,6 +1346,17 @@ class FocusListWidget(QWidget):
             self.tree.blockSignals(
                 False
             )
+
+            self.tree.setUpdatesEnabled(
+                True
+            )
+
+            try:
+
+                self.tree.viewport().update()
+
+            except Exception:
+                pass
 
             self._refreshing = False
 

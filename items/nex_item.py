@@ -40,6 +40,7 @@ except ImportError:
 
 
 import NEx_SDBM.core.node_editor as NEx
+import NEx_SDBM.core.utilities.scene_index as scene_index
 
 class NExTitleEditor(QGraphicsTextItem):
 
@@ -597,21 +598,19 @@ class NExGraphicsItem(QGraphicsItem):
         item
     ):
 
-        depth = 0
+        try:
 
-        parent = self.get_parent_container_for_item(
-            item
-        )
-
-        while parent:
-
-            depth += 1
-
-            parent = self.get_parent_container_for_item(
-                parent
+            index = scene_index.get_scene_index(
+                scene=self.scene()
             )
 
-        return depth
+            return index.get_depth(
+                item
+            )
+
+        except Exception:
+
+            return 0
 
 
     def get_z_value_for_item(
@@ -671,13 +670,23 @@ class NExGraphicsItem(QGraphicsItem):
         if not scene:
             return
 
-        nex_items = [
-            item
-            for item in scene.items()
-            if self.is_nex_item(
-                item
+        try:
+
+            index = scene_index.get_scene_index(
+                scene=scene
             )
-        ]
+
+            nex_items = index.get_nex_items()
+
+        except Exception:
+
+            nex_items = [
+                item
+                for item in scene.items()
+                if self.is_nex_item(
+                    item
+                )
+            ]
 
         nex_items = sorted(
             nex_items,
@@ -691,7 +700,6 @@ class NExGraphicsItem(QGraphicsItem):
             self.update_z_for_item(
                 item
             )
-
 
     # -----------------------------------------------------
     # FocusViewList Event Abstraction
@@ -750,49 +758,17 @@ class NExGraphicsItem(QGraphicsItem):
 
         try:
 
-            child_rect = child_item.sceneBoundingRect()
+            index = scene_index.get_scene_index(
+                scene=self.scene()
+            )
 
-        except RuntimeError:
-            return None
+            return index.get_parent(
+                child_item
+            )
 
         except Exception:
+
             return None
-
-        candidates = []
-
-        for container in self.get_scene_container_items():
-
-            if container is child_item:
-                continue
-
-            try:
-
-                if container.sceneBoundingRect().contains(
-                    child_rect
-                ):
-
-                    candidates.append(
-                        container
-                    )
-
-            except RuntimeError:
-                continue
-
-            except Exception:
-                continue
-
-        if not candidates:
-            return None
-
-        candidates = sorted(
-            candidates,
-            key=lambda item: (
-                item.get_area(),
-                item.zValue()
-            )
-        )
-
-        return candidates[0]
 
 
     def get_parent_container(self):
@@ -847,74 +823,64 @@ class NExGraphicsItem(QGraphicsItem):
         return False
 
 
-    def is_descendant_of(
+    def is_item_descendant_of(
         self,
+        child_item,
         possible_parent
     ):
 
-        return self.is_item_descendant_of(
-            self,
-            possible_parent
-        )
+        try:
+
+            index = scene_index.get_scene_index(
+                scene=self.scene()
+            )
+
+            return index.is_ancestor(
+                possible_parent,
+                child_item
+            )
+
+        except Exception:
+
+            return False
 
 
     def get_direct_child_nex_items(self):
 
-        children = []
+        try:
 
-        for item in self.get_scene_parentable_items():
-
-            if item is self:
-                continue
-
-            parent = self.get_parent_container_for_item(
-                item
+            index = scene_index.get_scene_index(
+                scene=self.scene()
             )
 
-            if parent is self:
+            return index.get_children(
+                self
+            )
 
-                children.append(
-                    item
-                )
+        except Exception:
 
-        return children
+            return []
 
     def filter_top_level_items(
         self,
         items
     ):
 
-        roots = []
+        try:
 
-        for item in items:
+            index = scene_index.get_scene_index(
+                scene=self.scene()
+            )
 
-            has_selected_parent = False
+            return index.filter_top_level_nex_items(
+                items
+            )
 
-            for other in items:
+        except Exception:
 
-                if other is item:
-                    continue
-
-                try:
-
-                    if self.is_item_descendant_of(
-                        item,
-                        other
-                    ):
-
-                        has_selected_parent = True
-                        break
-
-                except Exception:
-                    pass
-
-            if not has_selected_parent:
-
-                roots.append(
-                    item
-                )
-
-        return roots
+            return list(
+                items
+            )
 
 
     # -----------------------------------------------------
@@ -949,31 +915,46 @@ class NExGraphicsItem(QGraphicsItem):
 
         try:
 
+            index = scene_index.get_scene_index(
+                scene=self.scene()
+            )
+
             if self.is_container_nex_item(
                 item
             ):
 
-                item.update_direct_contents()
-
-                node_names = list(
-                    getattr(
-                        item,
-                        "contained_nodes",
-                        []
-                    )
-                )
-
-                node_items = self.resolve_node_items(
-                    node_names
-                )
-
+                # NEx children come from the same direct-parent graph.
                 children = list(
-                    getattr(
-                        item,
-                        "child_nex_items",
-                        []
+                    index.get_children(
+                        item
                     )
                 )
+
+                # Native Maya node children also come directly from
+                # the same direct-parent graph.
+                #
+                # Important:
+                # Do NOT go:
+                #     node names -> NEx.get_scene_node_map()
+                # here, because that re-solves native node identity
+                # outside the hierarchy cache and can move wrong nodes.
+                node_items = list(
+                    index.get_native_nodes_for_parent(
+                        item
+                    )
+                )
+
+                for node_item in node_items:
+
+                    node_name = index.get_native_node_name(
+                        node_item
+                    )
+
+                    if node_name:
+
+                        node_names.append(
+                            node_name
+                        )
 
         except Exception:
 
@@ -1001,10 +982,22 @@ class NExGraphicsItem(QGraphicsItem):
         if not scene:
             return
 
+        try:
+
+            index = scene_index.rebuild_scene_index(
+                scene=scene
+            )
+
+        except Exception:
+
+            index = None
+
         selected_items = [
             item
             for item in scene.selectedItems()
-            if self.is_nex_item(item)
+            if self.is_nex_item(
+                item
+            )
         ]
 
         if self not in selected_items:
@@ -1013,11 +1006,31 @@ class NExGraphicsItem(QGraphicsItem):
                 self
             )
 
-        self._drag_roots = (
-            self.filter_top_level_items(
-                selected_items
+        try:
+
+            if index:
+
+                self._drag_roots = (
+                    index.filter_top_level_nex_items(
+                        selected_items
+                    )
+                )
+
+            else:
+
+                self._drag_roots = (
+                    self.filter_top_level_items(
+                        selected_items
+                    )
+                )
+
+        except Exception:
+
+            self._drag_roots = (
+                self.filter_top_level_items(
+                    selected_items
+                )
             )
-        )
 
         self._drag_tree = {}
 
@@ -1033,8 +1046,25 @@ class NExGraphicsItem(QGraphicsItem):
         self,
         item,
         total_delta,
-        incremental_delta
+        incremental_delta,
+        visited_items=None,
+        visited_native_nodes=None
     ):
+
+        if visited_items is None:
+
+            visited_items = set()
+
+        if visited_native_nodes is None:
+
+            visited_native_nodes = set()
+
+        if item in visited_items:
+            return
+
+        visited_items.add(
+            item
+        )
 
         data = self._drag_tree.get(
             item
@@ -1054,6 +1084,13 @@ class NExGraphicsItem(QGraphicsItem):
         )
 
         for node_item in node_items:
+
+            if node_item in visited_native_nodes:
+                continue
+
+            visited_native_nodes.add(
+                node_item
+            )
 
             try:
 
@@ -1076,7 +1113,9 @@ class NExGraphicsItem(QGraphicsItem):
             self.apply_subtree_drag_delta(
                 child,
                 total_delta,
-                incremental_delta
+                incremental_delta,
+                visited_items=visited_items,
+                visited_native_nodes=visited_native_nodes
             )
 
     # -----------------------------------------------------
@@ -1505,9 +1544,21 @@ class NExGraphicsItem(QGraphicsItem):
             self._resizing = False
             self._resize_edge = None
             self._drag_tree_cached = False
+            try:
 
+                scene_index.mark_scene_index_dirty()
+
+            except Exception:
+                pass
             event.accept()
             return
+
+        try:
+
+            scene_index.mark_scene_index_dirty()
+
+        except Exception:
+            pass
 
         self.clear_interaction_state()
         self.update_z_hierarchy()
@@ -1596,6 +1647,9 @@ class NExGraphicsItem(QGraphicsItem):
 
         self._last_drag_delta = delta
 
+        visited_items = set()
+        visited_native_nodes = set()
+
         for root in self._drag_roots:
 
             try:
@@ -1603,7 +1657,9 @@ class NExGraphicsItem(QGraphicsItem):
                 self.apply_subtree_drag_delta(
                     root,
                     delta,
-                    incremental_delta
+                    incremental_delta,
+                    visited_items=visited_items,
+                    visited_native_nodes=visited_native_nodes
                 )
 
             except RuntimeError:

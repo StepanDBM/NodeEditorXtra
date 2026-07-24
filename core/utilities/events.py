@@ -95,12 +95,30 @@ def get_event_bus():
 
 def emit_items_changed():
 
+    try:
+
+        import NEx_SDBM.core.utilities.scene_index as scene_index
+
+        scene_index.mark_scene_index_dirty()
+
+    except Exception:
+        pass
+
     get_event_bus().emit_items_changed()
 
 
 def emit_item_changed(
     item
 ):
+
+    try:
+
+        import NEx_SDBM.core.utilities.scene_index as scene_index
+
+        scene_index.mark_scene_index_dirty()
+
+    except Exception:
+        pass
 
     get_event_bus().emit_item_changed(
         item
