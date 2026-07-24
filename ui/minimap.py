@@ -63,6 +63,7 @@ class MiniMapViewFilter(QObject):
 
         self.minimap = minimap
 
+
     def eventFilter(
         self,
         obj,
@@ -82,17 +83,53 @@ class MiniMapViewFilter(QObject):
 
             return False
 
-        watched_events = (
+        # Wheel on actual Maya Node Editor:
+        # viewport changed, not item geometry.
+        if event_type == QEvent.Wheel:
+
+            try:
+
+                self.minimap.schedule_viewport_refresh()
+
+                QTimer.singleShot(
+                    16,
+                    self.minimap.schedule_viewport_refresh
+                )
+
+                QTimer.singleShot(
+                    50,
+                    self.minimap.schedule_viewport_refresh
+                )
+
+            except Exception:
+                pass
+
+            return False
+
+        # Mouse move in Node Editor may mean:
+        # - viewport pan
+        # - native node drag
+        # - NEx item drag
+        #
+        # So update cached geometry cheaply.
+        if event_type == QEvent.MouseMove:
+
+            try:
+
+                self.minimap.schedule_geometry_refresh()
+
+            except Exception:
+                pass
+
+            return False
+
+        if event_type in (
             QEvent.MouseButtonPress,
             QEvent.MouseButtonRelease,
-            QEvent.MouseMove,
-            QEvent.Wheel,
             QEvent.Resize,
             QEvent.Show,
             QEvent.Hide
-        )
-
-        if event_type in watched_events:
+        ):
 
             try:
 
@@ -100,6 +137,17 @@ class MiniMapViewFilter(QObject):
 
             except Exception:
                 pass
+
+            if event_type == QEvent.MouseButtonRelease:
+
+                try:
+
+                    self.minimap.schedule_geometry_refresh()
+
+                except Exception:
+                    pass
+
+            return False
 
         return False
 
@@ -130,12 +178,13 @@ class MiniMapWidget(QWidget):
         """
         self.viewport_scene_rect = None
 
-        self.draw_native_items = []
-        self.draw_nex_container_items = []
-        self.draw_nex_leaf_items = []
+        self.draw_native_entries = []
+        self.draw_nex_container_entries = []
+        self.draw_nex_leaf_entries = []
 
         self._model_refresh_pending = False
         self._viewport_refresh_pending = False
+        self._geometry_refresh_pending = False
 
         self.view_filter = MiniMapViewFilter(
             self
@@ -195,6 +244,34 @@ class MiniMapWidget(QWidget):
     # -----------------------------------------------------
     # Events / lifecycle
     # -----------------------------------------------------
+
+    def get_cached_entry_for_item(
+        self,
+        item
+    ):
+
+        try:
+
+            scene_rect = item.sceneBoundingRect()
+
+        except RuntimeError:
+            return None
+
+        except Exception:
+            return None
+
+        try:
+
+            if scene_rect.isNull() or scene_rect.isEmpty():
+                return None
+
+        except Exception:
+            return None
+
+        return (
+            item,
+            scene_rect
+        )
 
     def connect_events(self):
 
@@ -260,6 +337,72 @@ class MiniMapWidget(QWidget):
             self.refresh_viewport
         )
 
+    def schedule_geometry_refresh(self):
+
+        if self._geometry_refresh_pending:
+            return
+
+        self._geometry_refresh_pending = True
+
+        QTimer.singleShot(
+            16,
+            self.refresh_geometry
+        )
+
+
+    def refresh_geometry(self):
+
+        self._geometry_refresh_pending = False
+
+        self.refresh_cached_entry_rects()
+
+        base_bounds = self.compute_scene_bounds_from_cache()
+
+        self.scene_bounds = self.apply_minimap_zoom_to_bounds(
+            base_bounds
+        )
+
+        self.refresh_viewport()
+
+        self.update()
+
+
+    def refresh_cached_entry_rects(self):
+
+        self.draw_native_entries = self.refresh_entry_list_rects(
+            self.draw_native_entries
+        )
+
+        self.draw_nex_container_entries = self.refresh_entry_list_rects(
+            self.draw_nex_container_entries
+        )
+
+        self.draw_nex_leaf_entries = self.refresh_entry_list_rects(
+            self.draw_nex_leaf_entries
+        )
+
+
+    def refresh_entry_list_rects(
+        self,
+        entries
+    ):
+
+        refreshed = []
+
+        for item, old_rect in entries:
+
+            entry = self.get_cached_entry_for_item(
+                item
+            )
+
+            if entry:
+
+                refreshed.append(
+                    entry
+                )
+
+        return refreshed
+
 
     def refresh_model(self):
 
@@ -288,25 +431,48 @@ class MiniMapWidget(QWidget):
 
     def rebuild_draw_cache(self):
 
-        self.draw_native_items = self.get_native_node_items()
+        self.draw_native_entries = []
+        self.draw_nex_container_entries = []
+        self.draw_nex_leaf_entries = []
+
+        native_items = self.get_native_node_items()
+
+        for item in native_items:
+
+            entry = self.get_cached_entry_for_item(
+                item
+            )
+
+            if entry:
+
+                self.draw_native_entries.append(
+                    entry
+                )
 
         nex_items = self.get_nex_items()
 
-        self.draw_nex_container_items = [
-            item
-            for item in nex_items
+        for item in nex_items:
+
+            entry = self.get_cached_entry_for_item(
+                item
+            )
+
+            if not entry:
+                continue
+
             if self.is_nex_container_item(
                 item
-            )
-        ]
+            ):
 
-        self.draw_nex_leaf_items = [
-            item
-            for item in nex_items
-            if not self.is_nex_container_item(
-                item
-            )
-        ]
+                self.draw_nex_container_entries.append(
+                    entry
+                )
+
+            else:
+
+                self.draw_nex_leaf_entries.append(
+                    entry
+                )
     # -----------------------------------------------------
     # View binding
     # -----------------------------------------------------
@@ -437,9 +603,9 @@ class MiniMapWidget(QWidget):
         self.scene_bounds = None
         self.viewport_scene_rect = None
 
-        self.draw_native_items = []
-        self.draw_nex_container_items = []
-        self.draw_nex_leaf_items = []
+        self.draw_native_entries = []
+        self.draw_nex_container_entries = []
+        self.draw_nex_leaf_entries = []
 
         try:
 
@@ -729,13 +895,65 @@ class MiniMapWidget(QWidget):
     def compute_scene_bounds(self):
 
         return self.compute_scene_bounds_from_cache()
+    
+    def get_items_from_entries(
+        self,
+        entries
+    ):
+
+        return [
+            item
+            for item, scene_rect in entries
+        ]
+
+
+    def get_bounds_from_entries(
+        self,
+        entries,
+        include_viewport=False
+    ):
+
+        rects = [
+            scene_rect
+            for item, scene_rect in entries
+        ]
+
+        if include_viewport:
+
+            viewport_rect = self.get_viewport_scene_rect()
+
+            if viewport_rect:
+
+                rects.append(
+                    viewport_rect
+                )
+
+        if not rects:
+            return None
+
+        bounds = rects[0]
+
+        for rect in rects[1:]:
+
+            bounds = bounds.united(
+                rect
+            )
+
+        return bounds.adjusted(
+            -100,
+            -100,
+            100,
+            100
+        )
+
+
     def compute_scene_bounds_from_cache(self):
 
         if self.fit_mode == "nex":
 
-            bounds = self.get_bounds_from_scene_items(
-                self.draw_nex_container_items
-                + self.draw_nex_leaf_items,
+            bounds = self.get_bounds_from_entries(
+                self.draw_nex_container_entries
+                + self.draw_nex_leaf_entries,
                 include_viewport=False
             )
 
@@ -748,18 +966,15 @@ class MiniMapWidget(QWidget):
 
             if selected_items:
 
-                bounds = self.get_bounds_from_scene_items(
+                return self.get_bounds_from_scene_items(
                     selected_items,
                     include_viewport=False
                 )
 
-                if bounds:
-                    return bounds
-
-        return self.get_bounds_from_scene_items(
-            self.draw_native_items
-            + self.draw_nex_container_items
-            + self.draw_nex_leaf_items,
+        return self.get_bounds_from_entries(
+            self.draw_native_entries
+            + self.draw_nex_container_entries
+            + self.draw_nex_leaf_entries,
             include_viewport=True
         )
 
@@ -793,6 +1008,24 @@ class MiniMapWidget(QWidget):
     # -----------------------------------------------------
     # Mapping
     # -----------------------------------------------------
+
+    def get_event_local_pos(
+        self,
+        event
+    ):
+
+        try:
+
+            return QPointF(
+                event.position()
+            )
+
+        except Exception:
+
+            return QPointF(
+                event.pos()
+            )
+
 
     def get_draw_rect(self):
 
@@ -1051,15 +1284,34 @@ class MiniMapWidget(QWidget):
         zoom
     ):
 
-        self.minimap_zoom = max(
-            self.minimap_zoom_min,
-            min(
-                zoom,
-                self.minimap_zoom_max
-            )
+        old_zoom = self.minimap_zoom
+
+        new_zoom = self.clamp_minimap_zoom(
+            zoom
         )
 
-        self.schedule_refresh()
+        if new_zoom == old_zoom:
+            return
+
+        zoom_factor = (
+            new_zoom
+            / old_zoom
+        )
+
+        center_pos = QPointF(
+            self.rect().center()
+        )
+
+        anchor_scene_pos = self.map_to_scene_point(
+            center_pos
+        )
+
+        self.minimap_zoom = new_zoom
+
+        self.zoom_scene_bounds_around_point(
+            anchor_scene_pos,
+            zoom_factor
+        )
 
 
     def zoom_in(self):
@@ -1082,6 +1334,148 @@ class MiniMapWidget(QWidget):
 
         self.set_minimap_zoom(
             1.0
+        )
+
+    def clamp_minimap_zoom(
+        self,
+        zoom
+    ):
+
+        return max(
+            self.minimap_zoom_min,
+            min(
+                zoom,
+                self.minimap_zoom_max
+            )
+        )
+
+
+    def zoom_scene_bounds_around_point(
+        self,
+        anchor_scene_pos,
+        zoom_factor
+    ):
+
+        if not self.scene_bounds:
+            return
+
+        if zoom_factor == 0:
+            return
+
+        old_bounds = QRectF(
+            self.scene_bounds
+        )
+
+        old_width = old_bounds.width()
+        old_height = old_bounds.height()
+
+        if (
+            old_width <= 0
+            or old_height <= 0
+        ):
+            return
+
+        relative_x = (
+            anchor_scene_pos.x()
+            - old_bounds.left()
+        ) / old_width
+
+        relative_y = (
+            anchor_scene_pos.y()
+            - old_bounds.top()
+        ) / old_height
+
+        new_width = (
+            old_width
+            / zoom_factor
+        )
+
+        new_height = (
+            old_height
+            / zoom_factor
+        )
+
+        new_left = (
+            anchor_scene_pos.x()
+            - relative_x
+            * new_width
+        )
+
+        new_top = (
+            anchor_scene_pos.y()
+            - relative_y
+            * new_height
+        )
+
+        self.scene_bounds = QRectF(
+            new_left,
+            new_top,
+            new_width,
+            new_height
+        )
+
+        self.update()
+
+
+    def zoom_minimap_at_map_pos(
+        self,
+        map_pos,
+        zoom_in=True
+    ):
+
+        if not self.scene_bounds:
+
+            self.schedule_model_refresh()
+            return
+
+        old_zoom = self.minimap_zoom
+
+        if zoom_in:
+
+            new_zoom = self.clamp_minimap_zoom(
+                self.minimap_zoom
+                * self.minimap_zoom_step
+            )
+
+        else:
+
+            new_zoom = self.clamp_minimap_zoom(
+                self.minimap_zoom
+                / self.minimap_zoom_step
+            )
+
+        if new_zoom == old_zoom:
+            return
+
+        zoom_factor = (
+            new_zoom
+            / old_zoom
+        )
+
+        anchor_scene_pos = self.map_to_scene_point(
+            map_pos
+        )
+
+        self.minimap_zoom = new_zoom
+
+        self.zoom_scene_bounds_around_point(
+            anchor_scene_pos,
+            zoom_factor
+        )
+
+
+    def zoom_minimap_at_center(
+        self,
+        zoom_in=True
+    ):
+
+        center_pos = QPointF(
+            self.rect().center()
+        )
+
+        self.zoom_minimap_at_map_pos(
+            center_pos,
+            zoom_in=zoom_in
         )
     # -----------------------------------------------------
     # Viewport minimap helpers
@@ -1235,14 +1629,7 @@ class MiniMapWidget(QWidget):
             )
         )
 
-        for item in self.draw_native_items:
-
-            try:
-
-                scene_rect = item.sceneBoundingRect()
-
-            except Exception:
-                continue
+        for item, scene_rect in self.draw_native_entries:
 
             map_rect = self.scene_to_map_rect(
                 scene_rect
@@ -1264,15 +1651,9 @@ class MiniMapWidget(QWidget):
     def paint_single_nex_item(
         self,
         painter,
-        item
+        item,
+        scene_rect
     ):
-
-        try:
-
-            scene_rect = item.sceneBoundingRect()
-
-        except Exception:
-            return
 
         map_rect = self.scene_to_map_rect(
             scene_rect
@@ -1306,6 +1687,7 @@ class MiniMapWidget(QWidget):
                 1
             )
         )
+
         painter.drawRoundedRect(
             map_rect,
             2,
@@ -1317,11 +1699,12 @@ class MiniMapWidget(QWidget):
         painter
     ):
 
-        for item in self.draw_nex_container_items:
+        for item, scene_rect in self.draw_nex_container_entries:
 
             self.paint_single_nex_item(
                 painter,
-                item
+                item,
+                scene_rect
             )
 
     def paint_nex_leaf_items(
@@ -1329,11 +1712,12 @@ class MiniMapWidget(QWidget):
         painter
     ):
 
-        for item in self.draw_nex_leaf_items:
+        for item, scene_rect in self.draw_nex_leaf_entries:
 
             self.paint_single_nex_item(
                 painter,
-                item
+                item,
+                scene_rect
             )
 
     def paint_viewport(
@@ -1341,14 +1725,10 @@ class MiniMapWidget(QWidget):
         painter
     ):
 
-        viewport_rect = self.get_viewport_scene_rect()
+        map_rect = self.get_viewport_minimap_rect()
 
-        if not viewport_rect:
+        if not map_rect:
             return
-
-        map_rect = self.scene_to_map_rect(
-            viewport_rect
-        )
 
         painter.setBrush(
             Qt.NoBrush
@@ -1654,6 +2034,13 @@ class MiniMapWidget(QWidget):
 
         event.accept()
 
+    #--------------------------------------------
+    # WHEEL EVENTS ON ZOOM
+    #--------------------------------------------
+
+
+
+
     def wheelEvent(
         self,
         event
@@ -1667,15 +2054,32 @@ class MiniMapWidget(QWidget):
 
             delta = 0
 
+        if delta == 0:
+
+            event.accept()
+            return
+
+        map_pos = self.get_event_local_pos(
+            event
+        )
+
         if delta > 0:
 
-            self.zoom_in()
+            self.zoom_minimap_at_map_pos(
+                map_pos,
+                zoom_in=True
+            )
 
-        elif delta < 0:
+        else:
 
-            self.zoom_out()
+            self.zoom_minimap_at_map_pos(
+                map_pos,
+                zoom_in=False
+            )
 
         event.accept()
+
+
     def start_minimap_pan(
         self,
         event
