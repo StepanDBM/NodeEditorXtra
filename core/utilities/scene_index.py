@@ -1227,6 +1227,271 @@ class NExSceneIndex(object):
         return False
 
 
+
+    # -----------------------------------------------------
+    # Debug prints
+    # -----------------------------------------------------
+
+    def get_debug_item_label(
+        self,
+        item
+    ):
+
+        if item is None:
+            return "<None>"
+
+        item_type = getattr(
+            item,
+            "nex_item_type",
+            None
+        )
+
+        if item_type:
+
+            title = getattr(
+                item,
+                "title",
+                ""
+            )
+
+            return "{} | {}".format(
+                item_type,
+                title
+            )
+
+        node_name = self.native_node_name_by_item.get(
+            item
+        )
+
+        if node_name:
+
+            return "maya | {}".format(
+                node_name
+            )
+
+        return repr(
+            item
+        )
+
+
+    def debug_hierarchy(self):
+
+        self.ensure_current()
+
+        print("-"*50)
+
+        print(
+            "NEx SceneIndex | Hierarchy"
+        )
+
+        print(
+            "NEx items: {} | Containers: {} | Native nodes: {}".format(
+                len(
+                    self.nex_items
+                ),
+                len(
+                    self.container_items
+                ),
+                len(
+                    self.native_node_items
+                )
+            )
+        )
+
+        roots = self.get_root_nex_items()
+
+        if not roots:
+
+            print(
+                "NEx SceneIndex | No NEx roots."
+            )
+
+        for root in roots:
+
+            self.debug_print_subtree(
+                root,
+                indent=0,
+                visited=set()
+            )
+        
+        print("-"*50)
+
+
+    def debug_print_subtree(
+        self,
+        item,
+        indent=0,
+        visited=None
+    ):
+
+        if visited is None:
+
+            visited = set()
+
+        prefix = "    " * indent
+
+        if item in visited:
+
+            print(
+                "{}{}  <CYCLE>".format(
+                    prefix,
+                    self.get_debug_item_label(
+                        item
+                    )
+                )
+            )
+
+            return
+
+        visited.add(
+            item
+        )
+
+        parent = self.parent_by_item.get(
+            item
+        )
+
+        parent_label = self.get_debug_item_label(
+            parent
+        )
+
+        print(
+            "{}{}  parent={}".format(
+                prefix,
+                self.get_debug_item_label(
+                    item
+                ),
+                parent_label
+            )
+        )
+
+        native_nodes = self.native_nodes_by_parent.get(
+            item,
+            []
+        )
+
+        for node_item in native_nodes:
+
+            print(
+                "{}    {}".format(
+                    prefix,
+                    self.get_debug_item_label(
+                        node_item
+                    )
+                )
+            )
+
+        children = self.children_by_parent.get(
+            item,
+            []
+        )
+
+        for child in children:
+
+            self.debug_print_subtree(
+                child,
+                indent=indent + 1,
+                visited=visited
+            )
+
+
+    def debug_native_ownership(self):
+
+        self.ensure_current()
+
+        print("-"*50)
+
+        print(
+            "NEx SceneIndex | Native ownership"
+        )
+
+        if not self.native_nodes_by_parent:
+
+            print(
+                "NEx SceneIndex | No native node ownership."
+            )
+
+        for parent, node_items in self.native_nodes_by_parent.items():
+
+            print(
+                "Parent: {}".format(
+                    self.get_debug_item_label(
+                        parent
+                    )
+                )
+            )
+
+            for node_item in node_items:
+
+                print(
+                    "    {}".format(
+                        self.get_debug_item_label(
+                            node_item
+                        )
+                    )
+                )
+
+        print("-"*50)
+
+
+    def debug_item_parent(
+        self,
+        item
+    ):
+
+        self.ensure_current()
+
+        if is_nex_item(
+            item
+        ):
+
+            parent = self.parent_by_item.get(
+                item
+            )
+
+        else:
+
+            parent = self.native_parent_by_item.get(
+                item
+            )
+
+        print(
+            "NEx SceneIndex | item={} | parent={}".format(
+                self.get_debug_item_label(
+                    item
+                ),
+                self.get_debug_item_label(
+                    parent
+                )
+            )
+        )
+
+
+    def debug_drag_tree_for_item(
+        self,
+        item
+    ):
+
+        self.ensure_current()
+
+        print("-"*50)
+
+        print(
+            "NEx SceneIndex | Drag tree for {}".format(
+                self.get_debug_item_label(
+                    item
+                )
+            )
+        )
+
+        self.debug_print_subtree(
+            item,
+            indent=0,
+            visited=set()
+        )
+
+        print("-"*50)
+
 # ---------------------------------------------------------
 # Global index access
 # ---------------------------------------------------------
@@ -1295,3 +1560,57 @@ def rebuild_scene_index(
     )
 
     return index
+
+
+def debug_hierarchy(
+    scene=None
+):
+
+    index = get_scene_index(
+        scene=scene,
+        force_rebuild=True
+    )
+
+    index.debug_hierarchy()
+
+
+def debug_native_ownership(
+    scene=None
+):
+
+    index = get_scene_index(
+        scene=scene,
+        force_rebuild=True
+    )
+
+    index.debug_native_ownership()
+
+
+def debug_item_parent(
+    item,
+    scene=None
+):
+
+    index = get_scene_index(
+        scene=scene,
+        force_rebuild=True
+    )
+
+    index.debug_item_parent(
+        item
+    )
+
+
+def debug_drag_tree_for_item(
+    item,
+    scene=None
+):
+
+    index = get_scene_index(
+        scene=scene,
+        force_rebuild=True
+    )
+
+    index.debug_drag_tree_for_item(
+        item
+    )

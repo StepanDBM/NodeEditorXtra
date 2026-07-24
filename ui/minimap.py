@@ -96,7 +96,7 @@ class MiniMapViewFilter(QObject):
 
             try:
 
-                self.minimap.schedule_refresh()
+                self.minimap.schedule_viewport_refresh()
 
             except Exception:
                 pass
@@ -119,12 +119,37 @@ class MiniMapWidget(QWidget):
         self.view = None
         self.scene_bounds = None
 
+        
+        """
+        separate minimap Model vs Viewport Refresh split:
+        Model refresh:
+            Rebuild cached NEx/native draw data and scene bounds.
+
+        Viewport refresh:
+            Only update the green viewport rectangle and repaint.
+        """
+        self.viewport_scene_rect = None
+
+        self.draw_native_items = []
+        self.draw_nex_container_items = []
+        self.draw_nex_leaf_items = []
+
+        self._model_refresh_pending = False
+        self._viewport_refresh_pending = False
+
         self.view_filter = MiniMapViewFilter(
             self
         )
 
-        self._refresh_pending = False
+        #self._refresh_pending = False
         self._dragging = False
+
+        self._minimap_panning = False
+        self._minimap_pan_start_pos = QPointF(
+            0,
+            0
+        )
+        self._minimap_pan_start_bounds = None
 
         self._drag_scene_offset = QPointF(
             0,
@@ -165,7 +190,7 @@ class MiniMapWidget(QWidget):
 
         self.connect_events()
         self.reconnect_view()
-        self.schedule_refresh()
+        self.schedule_model_refresh()
 
     # -----------------------------------------------------
     # Events / lifecycle
@@ -176,11 +201,11 @@ class MiniMapWidget(QWidget):
         bus = events.get_event_bus()
 
         bus.items_changed.connect(
-            self.schedule_refresh
+            self.schedule_model_refresh
         )
 
         bus.item_changed.connect(
-            self.schedule_refresh
+            self.schedule_model_refresh
         )
 
         bus.tabs_changed.connect(
@@ -194,7 +219,7 @@ class MiniMapWidget(QWidget):
     def on_tabs_changed(self):
 
         self.reconnect_view()
-        self.schedule_refresh()
+        self.schedule_model_refresh()
 
     def on_current_tab_changed(
         self,
@@ -202,31 +227,86 @@ class MiniMapWidget(QWidget):
     ):
 
         self.reconnect_view()
-        self.schedule_refresh()
+        self.schedule_model_refresh()
 
     def schedule_refresh(self):
 
-        if self._refresh_pending:
+        # Backward-compatible alias.
+        self.schedule_model_refresh()
+
+
+    def schedule_model_refresh(self):
+
+        if self._model_refresh_pending:
             return
 
-        self._refresh_pending = True
+        self._model_refresh_pending = True
 
         QTimer.singleShot(
             0,
-            self.refresh
+            self.refresh_model
         )
 
-    def refresh(self):
 
-        self._refresh_pending = False
+    def schedule_viewport_refresh(self):
 
-        base_bounds = self.compute_scene_bounds()
+        if self._viewport_refresh_pending:
+            return
+
+        self._viewport_refresh_pending = True
+
+        QTimer.singleShot(
+            0,
+            self.refresh_viewport
+        )
+
+
+    def refresh_model(self):
+
+        self._model_refresh_pending = False
+
+        self.rebuild_draw_cache()
+
+        base_bounds = self.compute_scene_bounds_from_cache()
 
         self.scene_bounds = self.apply_minimap_zoom_to_bounds(
             base_bounds
         )
 
+        self.refresh_viewport()
+
         self.update()
+
+
+    def refresh_viewport(self):
+
+        self._viewport_refresh_pending = False
+
+        self.viewport_scene_rect = self.get_viewport_scene_rect()
+
+        self.update()
+
+    def rebuild_draw_cache(self):
+
+        self.draw_native_items = self.get_native_node_items()
+
+        nex_items = self.get_nex_items()
+
+        self.draw_nex_container_items = [
+            item
+            for item in nex_items
+            if self.is_nex_container_item(
+                item
+            )
+        ]
+
+        self.draw_nex_leaf_items = [
+            item
+            for item in nex_items
+            if not self.is_nex_container_item(
+                item
+            )
+        ]
     # -----------------------------------------------------
     # View binding
     # -----------------------------------------------------
@@ -355,6 +435,11 @@ class MiniMapWidget(QWidget):
         self.view = None
         self.scene = None
         self.scene_bounds = None
+        self.viewport_scene_rect = None
+
+        self.draw_native_items = []
+        self.draw_nex_container_items = []
+        self.draw_nex_leaf_items = []
 
         try:
 
@@ -640,15 +725,22 @@ class MiniMapWidget(QWidget):
                 item
             )
         ]
-
+    #just in case I forget any calls
     def compute_scene_bounds(self):
+
+        return self.compute_scene_bounds_from_cache()
+    def compute_scene_bounds_from_cache(self):
 
         if self.fit_mode == "nex":
 
-            return self.get_bounds_from_scene_items(
-                self.get_nex_items(),
-                include_viewport=True
+            bounds = self.get_bounds_from_scene_items(
+                self.draw_nex_container_items
+                + self.draw_nex_leaf_items,
+                include_viewport=False
             )
+
+            if bounds:
+                return bounds
 
         if self.fit_mode == "selection":
 
@@ -656,22 +748,18 @@ class MiniMapWidget(QWidget):
 
             if selected_items:
 
-                return self.get_bounds_from_scene_items(
+                bounds = self.get_bounds_from_scene_items(
                     selected_items,
-                    include_viewport=True
+                    include_viewport=False
                 )
 
-            # Fallback if nothing selected.
-            return self.get_bounds_from_scene_items(
-                self.get_native_node_items()
-                + self.get_nex_items(),
-                include_viewport=True
-            )
+                if bounds:
+                    return bounds
 
-        # Default: all.
         return self.get_bounds_from_scene_items(
-            self.get_native_node_items()
-            + self.get_nex_items(),
+            self.draw_native_items
+            + self.draw_nex_container_items
+            + self.draw_nex_leaf_items,
             include_viewport=True
         )
 
@@ -1001,7 +1089,11 @@ class MiniMapWidget(QWidget):
 
     def get_viewport_minimap_rect(self):
 
-        viewport_rect = self.get_viewport_scene_rect()
+        viewport_rect = self.viewport_scene_rect
+
+        if not viewport_rect:
+
+            viewport_rect = self.get_viewport_scene_rect()
 
         if not viewport_rect:
             return None
@@ -1009,7 +1101,6 @@ class MiniMapWidget(QWidget):
         return self.scene_to_map_rect(
             viewport_rect
         )
-
     def minimap_pos_is_inside_viewport(
         self,
         pos
@@ -1144,7 +1235,7 @@ class MiniMapWidget(QWidget):
             )
         )
 
-        for item in self.get_native_node_items():
+        for item in self.draw_native_items:
 
             try:
 
@@ -1226,7 +1317,7 @@ class MiniMapWidget(QWidget):
         painter
     ):
 
-        for item in self.get_nex_container_items():
+        for item in self.draw_nex_container_items:
 
             self.paint_single_nex_item(
                 painter,
@@ -1238,7 +1329,7 @@ class MiniMapWidget(QWidget):
         painter
     ):
 
-        for item in self.get_nex_leaf_items():
+        for item in self.draw_nex_leaf_items:
 
             self.paint_single_nex_item(
                 painter,
@@ -1384,7 +1475,7 @@ class MiniMapWidget(QWidget):
         except Exception:
             return
 
-        self.schedule_refresh()
+        self.schedule_viewport_refresh()
 
     def mouseDoubleClickEvent(
         self,
@@ -1420,6 +1511,17 @@ class MiniMapWidget(QWidget):
                 scene_view.frame_view_on_item(
                     scene_item
                 )
+                self.schedule_viewport_refresh()
+
+                QTimer.singleShot(
+                    50,
+                    self.schedule_viewport_refresh
+                )
+
+                QTimer.singleShot(
+                    150,
+                    self.schedule_viewport_refresh
+                )
 
             except Exception:
                 pass
@@ -1434,6 +1536,15 @@ class MiniMapWidget(QWidget):
         self,
         event
     ):
+
+        if event.button() == Qt.MiddleButton:
+
+            if self.start_minimap_pan(
+                event
+            ):
+
+                event.accept()
+                return
 
         if event.button() != Qt.LeftButton:
 
@@ -1472,7 +1583,6 @@ class MiniMapWidget(QWidget):
                 0
             )
 
-            # Clicking outside viewport should feel like a clean jump.
             use_drag_offset = False
             soften = False
 
@@ -1489,6 +1599,15 @@ class MiniMapWidget(QWidget):
         event
     ):
 
+        if self._minimap_panning:
+
+            self.update_minimap_pan(
+                event
+            )
+
+            event.accept()
+            return
+
         if not self._dragging:
             return
 
@@ -1504,6 +1623,16 @@ class MiniMapWidget(QWidget):
         self,
         event
     ):
+
+        if (
+            event.button() == Qt.MiddleButton
+            and self._minimap_panning
+        ):
+
+            self.end_minimap_pan()
+
+            event.accept()
+            return
 
         if self._dragging:
 
@@ -1547,3 +1676,100 @@ class MiniMapWidget(QWidget):
             self.zoom_out()
 
         event.accept()
+    def start_minimap_pan(
+        self,
+        event
+    ):
+
+        if not self.scene_bounds:
+            return False
+
+        self._minimap_panning = True
+
+        self._minimap_pan_start_pos = QPointF(
+            event.pos()
+        )
+
+        self._minimap_pan_start_bounds = QRectF(
+            self.scene_bounds
+        )
+
+        try:
+
+            self.setCursor(
+                Qt.ClosedHandCursor
+            )
+
+        except Exception:
+            pass
+
+        return True
+
+
+    def update_minimap_pan(
+        self,
+        event
+    ):
+
+        if not self._minimap_panning:
+            return
+
+        if not self._minimap_pan_start_bounds:
+            return
+
+        mapping = self.get_scale_and_offset()
+
+        if not mapping:
+            return
+
+        scale, offset_x, offset_y = mapping
+
+        if scale == 0:
+            return
+
+        current_pos = QPointF(
+            event.pos()
+        )
+
+        map_delta = (
+            current_pos
+            - self._minimap_pan_start_pos
+        )
+
+        scene_delta = QPointF(
+            map_delta.x()
+            / scale,
+            map_delta.y()
+            / scale
+        )
+
+        start_bounds = self._minimap_pan_start_bounds
+
+        # Grab-paper behavior:
+        # Drag right/down moves minimap contents right/down,
+        # so the represented scene bounds move left/up.
+        self.scene_bounds = QRectF(
+            start_bounds.left()
+            - scene_delta.x(),
+            start_bounds.top()
+            - scene_delta.y(),
+            start_bounds.width(),
+            start_bounds.height()
+        )
+
+        self.update()
+
+
+    def end_minimap_pan(self):
+
+        self._minimap_panning = False
+        self._minimap_pan_start_bounds = None
+
+        try:
+
+            self.setCursor(
+                Qt.ArrowCursor
+            )
+
+        except Exception:
+            pass

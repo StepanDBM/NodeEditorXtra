@@ -81,11 +81,15 @@ class FocusListWidget(QWidget):
         self.search_text = ""
         self.show_native_nodes = True
 
+        self._tree_refresh_pending = False
+        self._filter_refresh_pending = False
+        self._tree_items_by_scene_item = {}
+
         self.build_ui()
         self.create_connections()
 
         self.refresh_tabs()
-        self.refresh_tree()
+        self.refresh_tree_now()
 
     # -----------------------------------------------------
     # UI
@@ -219,11 +223,11 @@ class FocusListWidget(QWidget):
         bus = events.get_event_bus()
 
         bus.items_changed.connect(
-            self.refresh_tree
+            self.schedule_tree_refresh
         )
 
         bus.item_changed.connect(
-            self.refresh_tree
+            self.on_bus_item_changed
         )
 
         bus.tabs_changed.connect(
@@ -408,7 +412,7 @@ class FocusListWidget(QWidget):
                 error
             )
 
-        self.refresh_tree()
+        self.schedule_tree_refresh()
 
     def on_current_tab_changed(
         self,
@@ -426,12 +430,12 @@ class FocusListWidget(QWidget):
             )
         )
 
-        self.refresh_tree()
+        self.schedule_tree_refresh()
 
     def on_tabs_changed(self):
 
         self.refresh_tabs()
-        self.refresh_tree()
+        self.schedule_tree_refresh()
 
     # -----------------------------------------------------
     # Scene / item collection
@@ -691,7 +695,7 @@ class FocusListWidget(QWidget):
                 column,
                 foreground
             )
-
+        self._tree_items_by_scene_item[node_item] = tree_item
         return tree_item
 
 
@@ -750,9 +754,13 @@ class FocusListWidget(QWidget):
             or not self.search_text
         )
 
-        tree_item.setHidden(
-            not visible
-        )
+        hidden = not visible
+
+        if tree_item.isHidden() != hidden:
+
+            tree_item.setHidden(
+                hidden
+            )
 
         if child_match and self.search_text:
 
@@ -1149,7 +1157,7 @@ class FocusListWidget(QWidget):
             tree_item,
             nex_item
         )
-
+        self._tree_items_by_scene_item[nex_item] = tree_item
         return tree_item
 
     def build_hierarchy(self):
@@ -1295,7 +1303,34 @@ class FocusListWidget(QWidget):
             )
 
 
+    def schedule_tree_refresh(
+        self
+    ):
+
+        if self._tree_refresh_pending:
+            return
+
+        self._tree_refresh_pending = True
+
+        QTimer.singleShot(
+            100,
+            self.refresh_tree_now
+        )
+
+
     def refresh_tree(self):
+
+        # Backward-compatible alias.
+        self.schedule_tree_refresh()
+
+
+    def refresh_tree_now(self):
+
+        self._tree_refresh_pending = False
+
+        self._refresh_tree_impl()
+
+    def _refresh_tree_impl(self):
 
         if self._refreshing:
             return
@@ -1311,7 +1346,7 @@ class FocusListWidget(QWidget):
             self.tree.blockSignals(
                 True
             )
-
+            self._tree_items_by_scene_item = {}
             self.tree.clear()
 
             roots, children_by_parent, native_nodes_by_parent = (
@@ -1546,8 +1581,26 @@ class FocusListWidget(QWidget):
 
         self.search_text = text.strip().lower()
 
-        self.apply_tree_filter()
+        self.schedule_filter_refresh()
 
+    def schedule_filter_refresh(self):
+
+        if self._filter_refresh_pending:
+            return
+
+        self._filter_refresh_pending = True
+
+        QTimer.singleShot(
+            50,
+            self.apply_tree_filter_now
+        )
+
+
+    def apply_tree_filter_now(self):
+
+        self._filter_refresh_pending = False
+
+        self.apply_tree_filter()
 
     def on_show_native_nodes_toggled(
         self,
@@ -1563,4 +1616,51 @@ class FocusListWidget(QWidget):
             self.show_native_nodes
         )
 
-        self.refresh_tree()
+        self.schedule_tree_refresh()
+    def on_bus_item_changed(
+        self,
+        item
+    ):
+
+        tree_item = self._tree_items_by_scene_item.get(
+            item
+        )
+
+        if not tree_item:
+
+            # If we do not know this item yet, schedule a rebuild.
+            self.schedule_tree_refresh()
+            return
+
+        kind = tree_item.data(
+            0,
+            self.KIND_ROLE
+        )
+
+        if kind == self.KIND_NEX_ITEM:
+
+            try:
+
+                tree_item.setText(
+                    0,
+                    self.get_item_type_label(
+                        item
+                    )
+                )
+
+                tree_item.setText(
+                    1,
+                    self.get_item_title(
+                        item
+                    )
+                )
+
+                self.apply_row_style(
+                    tree_item,
+                    item
+                )
+
+            except Exception:
+                pass
+
+        self.schedule_filter_refresh()

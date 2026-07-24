@@ -169,25 +169,6 @@ def frame_view_on_item(
 
     except Exception:
         return False
-    try:
-
-        import NEx_SDBM.core.utilities.events as events
-
-        events.emit_items_changed()
-
-        QTimer.singleShot(
-            50,
-            events.emit_items_changed
-        )
-
-        QTimer.singleShot(
-            150,
-            events.emit_items_changed
-        )
-
-    except Exception:
-        pass
-
 
     return True
 
