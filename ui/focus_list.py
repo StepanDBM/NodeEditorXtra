@@ -20,7 +20,8 @@ try:
         QTreeWidgetItem,
         QHeaderView,
         QLineEdit,
-        QCheckBox
+        QCheckBox,
+        QMenu
     )
 
 except ImportError:
@@ -43,10 +44,12 @@ except ImportError:
         QTreeWidgetItem,
         QHeaderView,
         QLineEdit,
-        QCheckBox
+        QCheckBox,
+        QMenu
     )
 from maya import cmds
 
+import NEx_SDBM.api as api
 import NEx_SDBM.core.node_editor as NEx
 import NEx_SDBM.core.scene_view as scene_view
 import NEx_SDBM.core.utilities.events as events
@@ -167,16 +170,10 @@ class FocusListWidget(QWidget):
             QHeaderView.Interactive
         )
 
-        self.tree.setMinimumHeight(
-            180
-        )
+        self.tree.setMinimumHeight(180)
 
-        self.tree.setAlternatingRowColors(
-            True
-        )
-        self.tree.setUniformRowHeights(
-            True
-        )
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setUniformRowHeights(True)
 
         self.tree.setSelectionMode(
             QAbstractItemView.SingleSelection
@@ -187,13 +184,12 @@ class FocusListWidget(QWidget):
             | QAbstractItemView.EditKeyPressed
         )
 
-        self.tree.setExpandsOnDoubleClick(
-            False
+        self.tree.setExpandsOnDoubleClick(False)
+        self.tree.setContextMenuPolicy(
+            Qt.CustomContextMenu
         )
 
-        layout.addWidget(
-            self.tree
-        )
+        layout.addWidget(self.tree)
 
     def create_connections(self):
 
@@ -237,6 +233,10 @@ class FocusListWidget(QWidget):
 
         bus.current_tab_changed.connect(
             self.on_current_tab_changed
+        )
+
+        self.tree.customContextMenuRequested.connect(
+            self.on_tree_context_menu
         )
 
     # -----------------------------------------------------
@@ -1076,34 +1076,69 @@ class FocusListWidget(QWidget):
         tree_item,
         nex_item
     ):
-
-        background = QBrush(
-            self.get_item_color(
-                nex_item
+        is_hidden = bool(
+            getattr(
+                nex_item,
+                "hidden",
+                False
             )
         )
 
-        foreground = QBrush(
-            QColor(
-                255,
-                255,
-                255
+        if is_hidden:
+            background = QBrush(
+                QColor(
+                    45,
+                    45,
+                    45,
+                    120
+                )
             )
-        )
+            foreground = QBrush(
+                QColor(
+                    150,
+                    150,
+                    150
+                )
+            )
+
+        else:
+            background = QBrush(
+                self.get_item_color(
+                    nex_item
+                )
+            )
+
+            foreground = QBrush(
+                QColor(
+                    255,
+                    255,
+                    255
+                )
+            )
 
         for column in range(
             self.tree.columnCount()
         ):
-
             tree_item.setBackground(
                 column,
                 background
             )
-
             tree_item.setForeground(
                 column,
                 foreground
             )
+
+            try:
+                font = tree_item.font(column)
+                font.setItalic(is_hidden)
+
+                tree_item.setFont(
+                    column,
+                    font
+                )
+
+            except Exception:
+                pass
 
     # -----------------------------------------------------
     # Tree creation / refresh
@@ -1463,23 +1498,34 @@ class FocusListWidget(QWidget):
                     node_tree_item
                 )
 
+
+
     # -----------------------------------------------------
-    # Tree events
+    # Focus
     # -----------------------------------------------------
 
-    def on_item_double_clicked(
+    def focus_scene_item(
         self,
-        tree_item,
-        column
+        scene_item
     ):
-
-        scene_item = tree_item.data(
-            0,
-            self.ITEM_ROLE
-        )
 
         if not scene_item:
             return
+
+        if getattr(
+            scene_item,
+            "hidden",
+            False
+        ):
+
+            try:
+
+                scene_item.set_hidden(
+                    False
+                )
+
+            except Exception:
+                pass
 
         tab_info = self.current_tab_info
 
@@ -1502,6 +1548,27 @@ class FocusListWidget(QWidget):
             lambda: scene_view.frame_view_on_item(
                 scene_item
             )
+        )
+    # -----------------------------------------------------
+    # Tree events
+    # -----------------------------------------------------
+
+    def on_item_double_clicked(
+        self,
+        tree_item,
+        column
+    ):
+
+        scene_item = tree_item.data(
+            0,
+            self.ITEM_ROLE
+        )
+
+        if not scene_item:
+            return
+
+        self.focus_scene_item(
+            scene_item
         )
 
     def on_tree_item_changed(
@@ -1810,3 +1877,133 @@ class FocusListWidget(QWidget):
                 pass
 
         self.schedule_filter_refresh()
+
+
+    def on_tree_context_menu(
+        self,
+        position
+    ):
+
+        tree_item = self.tree.itemAt(
+            position
+        )
+
+        if not tree_item:
+            return
+
+        kind = tree_item.data(
+            0,
+            self.KIND_ROLE
+        )
+
+        scene_item = tree_item.data(
+            0,
+            self.ITEM_ROLE
+        )
+
+        if not scene_item:
+            return
+
+        menu = QMenu(
+            self.tree
+        )
+
+        focus_action = menu.addAction(
+            "Focus"
+        )
+
+        duplicate_action = None
+        visibility_action = None
+        delete_action = None
+
+        if kind == self.KIND_NEX_ITEM:
+
+            menu.addSeparator()
+
+            duplicate_action = menu.addAction(
+                "Duplicate"
+            )
+
+            if getattr(
+                scene_item,
+                "hidden",
+                False
+            ):
+
+                visibility_action = menu.addAction(
+                    "Show"
+                )
+
+            else:
+
+                visibility_action = menu.addAction(
+                    "Hide"
+                )
+
+            delete_action = menu.addAction(
+                "Delete"
+            )
+
+        global_position = self.tree.viewport().mapToGlobal(
+            position
+        )
+
+        try:
+
+            result = menu.exec_(
+                global_position
+            )
+
+        except AttributeError:
+
+            result = menu.exec(
+                global_position
+            )
+
+        if result == focus_action:
+
+            self.focus_scene_item(
+                scene_item
+            )
+
+            return
+
+        if duplicate_action is not None and result == duplicate_action:
+
+            api.duplicate_nex_item(
+                scene_item
+            )
+
+            self.schedule_tree_refresh()
+
+            return
+
+        if visibility_action is not None and result == visibility_action:
+
+            try:
+
+                scene_item.toggle_hidden()
+
+            except Exception:
+                pass
+
+            self.update_tree_item_for_scene_item(
+                scene_item
+            )
+
+            self.schedule_filter_refresh()
+
+            return
+
+        if delete_action is not None and result == delete_action:
+
+            try:
+
+                scene_item.delete_self()
+
+            except Exception:
+                pass
+
+            self.schedule_tree_refresh()
+
+            return

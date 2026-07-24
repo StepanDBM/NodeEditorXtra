@@ -4,7 +4,8 @@ try:
     from PySide2.QtWidgets import (
         QGraphicsItem,
         QGraphicsTextItem,
-        QColorDialog
+        QColorDialog,
+        QMenu
     )
 
     from PySide2.QtGui import (
@@ -23,7 +24,8 @@ except ImportError:
     from PySide6.QtWidgets import (
         QGraphicsItem,
         QGraphicsTextItem,
-        QColorDialog
+        QColorDialog,
+        QMenu
     )
 
     from PySide6.QtGui import (
@@ -190,6 +192,8 @@ class NExGraphicsItem(QGraphicsItem):
         self.title = title
         self.title_editor = None
 
+        self.hidden = False
+
         self.header_height = 28
 
         self._hovered = False
@@ -235,6 +239,59 @@ class NExGraphicsItem(QGraphicsItem):
             Qt.LeftButton
             | Qt.RightButton
         )
+
+
+    def contextMenuEvent(
+        self,
+        event
+    ):
+
+        menu = QMenu()
+
+        duplicate_action = menu.addAction("Duplicate")
+
+        if self.is_hidden():
+
+            visibility_action = menu.addAction("Show")
+
+        else:
+
+            visibility_action = menu.addAction("Hide")
+
+        delete_action = menu.addAction("Delete")
+
+        try:
+
+            result = menu.exec_(
+                event.screenPos()
+            )
+
+        except AttributeError:
+
+            result = menu.exec(
+                event.screenPos()
+            )
+
+        if result == duplicate_action:
+
+            self.duplicate_self()
+            event.accept()
+            return
+
+        if result == visibility_action:
+
+            self.toggle_hidden()
+            event.accept()
+            return
+
+        if result == delete_action:
+
+            self.delete_self()
+            event.accept()
+            return
+
+        event.accept()
+
 
     # -----------------------------------------------------
     # Generic geometry
@@ -1080,6 +1137,62 @@ class NExGraphicsItem(QGraphicsItem):
     ):
 
         self.pick_color()
+
+
+
+    # -----------------------------------------------------
+    # Visibility / Hidden state
+    # -----------------------------------------------------
+
+    def set_hidden(
+        self,
+        hidden,
+        notify=True
+    ):
+
+        self.hidden = bool(
+            hidden
+        )
+
+        try:
+
+            self.setVisible(
+                not self.hidden
+            )
+
+        except RuntimeError:
+            pass
+
+        except Exception:
+            pass
+
+        if notify:
+
+            self.notify_item_changed(
+                reason="visibility"
+            )
+
+
+    def toggle_hidden(self):
+
+        self.set_hidden(
+            not getattr(
+                self,
+                "hidden",
+                False
+            )
+        )
+
+
+    def is_hidden(self):
+
+        return bool(
+            getattr(
+                self,
+                "hidden",
+                False
+            )
+        )
     # -----------------------------------------------------
     # Header Abstaction
     # -----------------------------------------------------
@@ -1130,6 +1243,92 @@ class NExGraphicsItem(QGraphicsItem):
         except Exception:
             pass
         self.update()
+
+
+    # -----------------------------------------------------
+    # Duplicate
+    # -----------------------------------------------------
+
+    def copy_common_state_to(
+        self,
+        other
+    ):
+
+        try:
+
+            other.title = "{} Copy".format(
+                self.title
+            )
+
+        except Exception:
+            pass
+
+        for attr in (
+            "width",
+            "height",
+            "roundness",
+            "header_height",
+            "background_color",
+            "header_color",
+            "border_color",
+            "selected_border_color",
+            "normal_border_alpha",
+            "normal_header_darker_factor",
+            "normal_border_darker_factor",
+            "hover_lighter_factor",
+            "pressed_lighter_factor",
+            "normal_border_width",
+            "selected_border_width",
+            "pressed_border_width",
+        ):
+
+            try:
+
+                setattr(
+                    other,
+                    attr,
+                    getattr(
+                        self,
+                        attr
+                    )
+                )
+
+            except Exception:
+                pass
+
+        try:
+
+            other.hidden = False
+            other.setVisible(
+                True
+            )
+
+        except Exception:
+            pass
+
+
+    def duplicate_self(
+        self,
+        offset=40
+    ):
+
+        try:
+
+            import NEx_SDBM.api as api
+
+            return api.duplicate_nex_item(
+                self,
+                offset=offset
+            )
+
+        except Exception as error:
+
+            print(
+                "NEx | Could not duplicate item:",
+                error
+            )
+
+        return None
 
 
     # -----------------------------------------------------

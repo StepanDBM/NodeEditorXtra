@@ -18,15 +18,16 @@ from NEx_SDBM.items.backdrop import BackdropItem
 from NEx_SDBM.items.comment import CommentItem
 from NEx_SDBM.items.image import ImageItem
 
-NEX_VERSION = 2
+NEX_VERSION = 3
 
 # ---------------------------------------------------------
 # Event Detection Actions
 # ---------------------------------------------------------
-def notify_items_changed():
-
+def notify_items_changed(
+    reason="unknown"
+):
     try:
-        events.emit_items_changed()
+        events.emit_items_changed(reason=reason)
 
     except Exception:
         pass
@@ -116,6 +117,38 @@ def color_to_data(color):
         color.blue(),
         color.alpha()
     ]
+
+def apply_hidden_state(
+    item,
+    data
+):
+
+    hidden = bool(
+        data.get(
+            "hidden",
+            False
+        )
+    )
+
+    try:
+
+        item.set_hidden(
+            hidden,
+            notify=False
+        )
+
+    except Exception:
+
+        try:
+
+            item.hidden = hidden
+
+            item.setVisible(
+                not hidden
+            )
+
+        except Exception:
+            pass
 
 
 def color_from_data(data, fallback=None):
@@ -329,7 +362,13 @@ def serialize_backdrop(
 
             "header_height": backdrop.header_height
         },
-
+        "hidden": bool(
+            getattr(
+                backdrop,
+                "hidden",
+                False
+            )
+        ),
         "nodes": list(
             getattr(
                 backdrop,
@@ -377,7 +416,14 @@ def serialize_comment(
             "selected_border_color": color_to_data(
                 comment.selected_border_color
             )
-        }
+        },
+        "hidden": bool(
+            getattr(
+                comment,
+                "hidden",
+                False
+            )
+        )        
     }
 
 def serialize_image(
@@ -426,7 +472,14 @@ def serialize_image(
             "selected_border_color": color_to_data(
                 image.selected_border_color
             )
-        }
+        },
+        "hidden": bool(
+            getattr(
+                image,
+                "hidden",
+                False
+            )
+        )
     }
 
 def build_data():
@@ -516,6 +569,12 @@ def data_has_nex_items(data):
             return True
 
         if tab_data.get(
+            "images",
+            []
+        ):
+            return True
+
+        if tab_data.get(
             "items",
             []
         ):
@@ -532,8 +591,8 @@ def data_has_nex_items(data):
         []
     ):
         return True
-    
-    if tab_data.get(
+
+    if data.get(
         "images",
         []
     ):
@@ -736,7 +795,10 @@ def apply_backdrop_data(
             []
         )
     )
-
+    apply_hidden_state(
+        backdrop,
+        data
+    )
     backdrop.update()
 
 
@@ -869,10 +931,11 @@ def create_comment_from_data(
         comment.selected_border_color
     )
 
-    scene.addItem(
-        comment
+    apply_hidden_state(
+        comment,
+        data
     )
-
+    scene.addItem(comment)
     comment.update()
 
     return comment
@@ -975,10 +1038,11 @@ def create_image_from_data(
 
     image.load_pixmap()
 
-    scene.addItem(
-        image
+    apply_hidden_state(
+        image,
+        data
     )
-
+    scene.addItem(image)
     image.update()
 
     return image
@@ -1123,7 +1187,7 @@ def load_tabs_from_data(data):
 
         except Exception:
             pass
-    notify_items_changed()
+    notify_items_changed(reason="load")
     return created
 
 
@@ -1148,9 +1212,7 @@ def load_nex(filepath):
 
 def load_data(data):
 
-    created = load_tabs_from_data(
-        data
-    )
+    created = load_tabs_from_data(data)
 
     return created
 
@@ -1172,19 +1234,13 @@ def clear_items(items):
             scene = item.scene()
 
             if scene:
-                scene.removeItem(
-                    item
-                )
+                scene.removeItem(item)
 
-            removed.append(
-                item
-            )
+            removed.append(item)
 
         except RuntimeError:
 
-            removed.append(
-                item
-            )
+            removed.append(item)
 
         except Exception as error:
 
@@ -1196,26 +1252,15 @@ def clear_items(items):
     return removed
 
 def clear_backdrops(backdrops):
-
-    return clear_items(
-        backdrops
-    )
+    return clear_items(backdrops)
 
 
 def clear_all_tab_backdrops():
-
     removed = []
-
     for tab_index, scene in NEx.iter_tab_scenes():
 
-        items = get_scene_items(
-            scene
-        )
+        items = get_scene_items(scene)
 
-        removed.extend(
-            clear_items(
-                items
-            )
-        )
-    notify_items_changed()
+        removed.extend(clear_items(items))
+    notify_items_changed(reason = "clear")
     return removed

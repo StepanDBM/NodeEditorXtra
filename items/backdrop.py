@@ -431,26 +431,17 @@ class BackdropItem(NExGraphicsItem):
             self.update_z_hierarchy()
         return changed
     # -----------------------------------------------------
-    # Deletion
+    # Context Menu
     # -----------------------------------------------------
 
     def contextMenuEvent(
         self,
         event
     ):
-        try:
-            from PySide2.QtWidgets import QMenu
 
-        except ImportError:
-            from PySide6.QtWidgets import QMenu
-
-        menu = QMenu()
-
-        delete_action = menu.addAction("Delete")
-        result = menu.exec_(event.screenPos())
-
-        if result == delete_action:
-            self.delete_self()
+        super().contextMenuEvent(
+            event
+        )
 
     # -----------------------------------------------------
     # Mouse events

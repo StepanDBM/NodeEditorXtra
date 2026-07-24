@@ -25,6 +25,300 @@ def clear_nex_selection():
     scene.clearSelection()
 
 
+
+def copy_color(
+    color
+):
+
+    try:
+
+        return type(
+            color
+        )(
+            color
+        )
+
+    except Exception:
+        pass
+
+    try:
+
+        from PySide2.QtGui import QColor
+
+    except ImportError:
+
+        from PySide6.QtGui import QColor
+
+    try:
+
+        return QColor(
+            color.red(),
+            color.green(),
+            color.blue(),
+            color.alpha()
+        )
+
+    except Exception:
+
+        return QColor(
+            45,
+            45,
+            45,
+            220
+        )
+
+
+def duplicate_nex_item(
+    item,
+    offset=40
+):
+
+    scene = None
+
+    try:
+
+        scene = item.scene()
+
+    except RuntimeError:
+        return None
+
+    except Exception:
+        return None
+
+    if not scene:
+        return None
+
+    item_type = getattr(
+        item,
+        "nex_item_type",
+        ""
+    )
+
+    duplicate = None
+
+    if item_type == "backdrop":
+
+        duplicate = BackdropItem(
+            title="{} Copy".format(
+                getattr(
+                    item,
+                    "title",
+                    "Backdrop"
+                )
+            ),
+            width=getattr(
+                item,
+                "width",
+                300
+            ),
+            height=getattr(
+                item,
+                "height",
+                180
+            )
+        )
+
+    elif item_type == "comment":
+
+        text = getattr(
+            item,
+            "text",
+            None
+        )
+
+        if text is None:
+
+            text = getattr(
+                item,
+                "comment_text",
+                ""
+            )
+
+        try:
+
+            duplicate = CommentItem(
+                title="{} Copy".format(
+                    getattr(
+                        item,
+                        "title",
+                        "Comment"
+                    )
+                ),
+                text=text
+            )
+
+        except TypeError:
+
+            duplicate = CommentItem(
+                "{} Copy".format(
+                    getattr(
+                        item,
+                        "title",
+                        "Comment"
+                    )
+                ),
+                text
+            )
+
+    elif item_type == "image":
+
+        image_path = getattr(
+            item,
+            "image_path",
+            None
+        )
+
+        try:
+
+            duplicate = ImageItem(
+                image_path=image_path,
+                title="{} Copy".format(
+                    getattr(
+                        item,
+                        "title",
+                        "Image"
+                    )
+                )
+            )
+
+        except TypeError:
+
+            try:
+
+                duplicate = ImageItem(
+                    image_path
+                )
+
+                duplicate.title = "{} Copy".format(
+                    getattr(
+                        item,
+                        "title",
+                        "Image"
+                    )
+                )
+
+            except Exception:
+
+                duplicate = None
+
+    if duplicate is None:
+        return None
+
+    try:
+
+        item.copy_common_state_to(
+            duplicate
+        )
+
+    except Exception:
+        pass
+
+    try:
+
+        duplicate.title = "{} Copy".format(
+            getattr(
+                item,
+                "title",
+                "NEx Item"
+            )
+        )
+
+    except Exception:
+        pass
+
+    scene.addItem(
+        duplicate
+    )
+
+    try:
+
+        duplicate.setPos(
+            item.pos().x() + offset,
+            item.pos().y() + offset
+        )
+
+    except Exception:
+
+        try:
+
+            duplicate.setPos(
+                item.pos()
+            )
+
+        except Exception:
+            pass
+
+    try:
+
+        duplicate.update()
+
+    except Exception:
+        pass
+
+    try:
+
+        events.emit_items_changed(
+            reason="create"
+        )
+
+    except Exception:
+        pass
+
+    return duplicate
+
+
+def duplicate_selected_nex_items(
+    offset=40
+):
+
+    try:
+
+        scene = NEx.get_scene()
+
+    except Exception:
+
+        scene = None
+
+    if not scene:
+        return []
+
+    try:
+
+        selected_items = scene.selectedItems()
+
+    except RuntimeError:
+
+        selected_items = []
+
+    except Exception:
+
+        selected_items = []
+
+    nex_items = [
+        item
+        for item in selected_items
+        if NEx.is_nex_item(
+            item
+        )
+    ]
+
+    duplicates = []
+
+    for item in nex_items:
+
+        duplicate = duplicate_nex_item(
+            item,
+            offset=offset
+        )
+
+        if duplicate:
+
+            duplicates.append(
+                duplicate
+            )
+
+    return duplicates
+
 # -----------------------------------------------------
 # FocusViewList Event Abstraction
 # -----------------------------------------------------
